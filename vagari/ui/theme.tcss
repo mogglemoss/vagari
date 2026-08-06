@@ -70,6 +70,38 @@ Footer {
     color: $warm-muted;
 }
 
+/* Command palette — Ministry issue, not factory default */
+CommandPalette {
+    background: $warm-surface 40%;
+}
+CommandPalette > Vertical {
+    background: $warm-surface;
+    border: round $warm-border;
+}
+CommandPalette > .command-palette--highlight {
+    color: $rust;
+    text-style: bold;
+}
+CommandPalette Input {
+    background: $warm-panel;
+    border: tall $warm-border;
+    color: $warm-text;
+}
+CommandPalette Input:focus {
+    border: tall $rust;
+}
+CommandPalette OptionList {
+    background: $warm-surface;
+    border: none;
+}
+CommandPalette OptionList > .option-list--option-highlighted {
+    background: $rust 20%;
+    color: $warm-text;
+}
+CommandPalette OptionList > .option-list--option-hover {
+    background: $warm-panel;
+}
+
 /* Kill the default blue focus ring everywhere */
 *:focus {
     border: round $warm-border;

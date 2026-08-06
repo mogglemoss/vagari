@@ -170,6 +170,21 @@ async def test_follow_me_end_to_end(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_command_palette_curated(tmp_path):
+    app = make_app(tmp_path)
+    commands = [c.title for c in app.get_system_commands(None)]
+    assert "Recon: refresh activity" in commands
+    assert "Arm lazy reconciliation" in commands
+    assert not any("theme" in c.lower() for c in commands)
+    async with app.run_test() as pilot:
+        await pilot.press("ctrl+p")
+        await pilot.pause()
+        from textual.command import CommandPalette
+
+        assert any(isinstance(s, CommandPalette) for s in app.screen_stack)
+
+
+@pytest.mark.asyncio
 async def test_view_filter(tmp_path):
     app = make_app(tmp_path)
     async with app.run_test() as pilot:

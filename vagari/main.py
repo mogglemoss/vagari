@@ -7,7 +7,7 @@ Ministry of Pantoscopic Observance
 from __future__ import annotations
 
 from textual import events
-from textual.app import App, ComposeResult
+from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Input, Static, Tree
@@ -58,6 +58,48 @@ class MapperApp(App):
         self.session = session or Session.open(Store())
         self.recon_enabled = recon    # tests disable the network fetch
         self.follow_enabled = follow  # tests disable the chatlog tailer
+
+    def get_system_commands(self, screen):
+        """Curated Bureau commands for the palette (Ctrl+P) — replaces
+        Textual's defaults (theme switching would undermine the Ministry)."""
+        yield SystemCommand(
+            "Reference", "Show the instrument reference (?)", self.action_show_help
+        )
+        yield SystemCommand(
+            "Arm lazy reconciliation",
+            "Next deposit reports despawned signatures",
+            self.action_arm_lazy,
+        )
+        yield SystemCommand(
+            "Sweep despawned",
+            "Strike reported despawns from the record",
+            lambda: self._after_engine(self.session.execute("sweep")),
+        )
+        yield SystemCommand(
+            "Recon: refresh activity",
+            "One ESI request; last-hour kills per system",
+            lambda: self.run_worker(
+                self._refresh_activity(), exclusive=True, group="recon"
+            ),
+        )
+        yield SystemCommand(
+            "File K162", "File a pending unmapped arrival", self.action_file_k162
+        )
+        yield SystemCommand("Undo", "Revert one revision", self.action_undo)
+        yield SystemCommand("Redo", "Reinstate one revision", self.action_redo)
+        yield SystemCommand(
+            "View: full", "All signatures", lambda: self.action_set_view("full")
+        )
+        yield SystemCommand(
+            "View: paths", "Wormholes only", lambda: self.action_set_view("paths")
+        )
+        yield SystemCommand(
+            "View: gas", "Wormholes and gas", lambda: self.action_set_view("gas")
+        )
+        yield SystemCommand(
+            "Return to root", "Move ◉ YOU to the top of the chain", self.action_go_top
+        )
+        yield SystemCommand("Quit", "Close the instrument", self.action_quit)
 
     def compose(self) -> ComposeResult:
         yield Static(id="app-header")
