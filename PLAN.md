@@ -152,9 +152,11 @@ PROCEED."). Same palette, extracted to `theme.tcss`.
 reconcile + catalog loader; 34 fixture-driven tests green; round-trip demo
 (`scripts/demo_roundtrip.py`) passing.
 
-**M2 — TUI parity-plus.** App shell, tree, detail panel, command bar, paste ingestion,
-views, undo, named chains, help. Exit: everything bashmapper does, cross-platform, plus
-signal %, timestamps, EOL marks, unbounded undo. This is the v0.1 tag.
+**M2 — TUI parity-plus.** ✅ DONE (2026-08-06). App shell, chain tree, detail panel,
+command bar (bashmapper grammar + `sweep`), paste-anywhere ingestion with lazy arming,
+full/paths/gas views, unbounded undo/redo, named chains, help overlay, Ministry voice
+(Anoikis Cartographic Bureau). 54 tests incl. headless pilot smoke tests; SVG
+screenshots via `scripts/screenshot.py`. Local tag v0.1.0.
 
 **M3 — enrichment + timers.** Catalog auto-label on jcode; wormhole lifetime estimates
 from `wormhole_types.json` (per-type lifetime/mass already bundled); ESI/zKill optional

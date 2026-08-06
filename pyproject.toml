@@ -4,11 +4,17 @@ version = "0.1.0.dev0"
 description = "HARUSPEX CARTOGRAPHY DIVISION — a terminal wormhole chain mapper for EVE Online"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "textual>=8.2.8",
+]
+
+[project.scripts]
+tuimapper = "tuimapper.main:main"
 
 [dependency-groups]
 dev = [
     "pytest>=9.0",
+    "pytest-asyncio>=1.4.0",
 ]
 
 [build-system]

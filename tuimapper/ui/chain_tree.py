@@ -1,0 +1,119 @@
+"""The chain rendered as a Textual Tree."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from textual.widgets import Tree
+from textual.widgets.tree import TreeNode
+
+from tuimapper.model.chain import Connection, Signature, SigGroup, System, utcnow
+from tuimapper.session import Session
+
+_GLYPHS = {
+    SigGroup.WORMHOLE: "~",
+    SigGroup.COMBAT: "▸",
+    SigGroup.DATA: "◆",
+    SigGroup.RELIC: "◈",
+    SigGroup.GAS: "<",
+    SigGroup.ORE: "▪",
+    SigGroup.UNKNOWN: "·",
+}
+
+RUST = "#C15F3C"
+MUTED = "#7a756e"
+TEXT = "#e8e6e3"
+DIM = "#8A3820"
+WARN = "#d4a017"
+
+
+def age_text(since: datetime, now: datetime | None = None) -> str:
+    """'3h12m' style age."""
+    delta = (now or utcnow()) - since
+    minutes = int(delta.total_seconds() // 60)
+    if minutes < 60:
+        return f"{minutes}m"
+    return f"{minutes // 60}h{minutes % 60:02d}m"
+
+
+def _visible(sig: Signature, view: str) -> bool:
+    if view == "paths":
+        return sig.group is SigGroup.WORMHOLE
+    if view == "gas":
+        return sig.group in (SigGroup.WORMHOLE, SigGroup.GAS)
+    return True
+
+
+def system_label(system: System, here: bool) -> str:
+    parts = [f"[bold {TEXT}]{system.name}[/bold {TEXT}]"]
+    meta = []
+    if system.jclass:
+        meta.append(system.jclass + (f"+{system.statics}" if system.statics else ""))
+    if system.effect:
+        meta.append(system.effect)
+    if meta:
+        parts.append(f"[{MUTED}]{' · '.join(meta)}[/{MUTED}]")
+    if here:
+        parts.append(f"[bold {RUST}]◉ YOU[/bold {RUST}]")
+    return "  ".join(parts)
+
+
+def sig_label(sig: Signature, conn: Connection | None) -> str:
+    glyph = _GLYPHS[sig.group]
+    flag = f"[bold {WARN}]![/bold {WARN}]" if sig.flagged else ""
+    name = sig.label or sig.name
+    if not name and sig.signal < 100:
+        name = f"({sig.signal:.0f}%)"
+    color = RUST if sig.group is SigGroup.WORMHOLE else MUTED
+    text = f"[{color}]{glyph}[/{color}] [{TEXT}]{sig.prefix}[/{TEXT}]{flag}"
+    if name:
+        text += f" [{MUTED}]{name}[/{MUTED}]"
+    if conn is not None:
+        badges = []
+        if conn.wh_type:
+            badges.append(conn.wh_type)
+        badges.append(age_text(conn.opened_at))
+        if conn.mass.value != "fresh":
+            badges.append(conn.mass.value.upper())
+        if conn.eol:
+            badges.append(f"[bold {DIM}]EOL[/bold {DIM}]")
+        text += f"  [{MUTED}]{' '.join(badges)}[/{MUTED}]"
+    return text
+
+
+class ChainTree(Tree):
+    """Tree of systems and signatures. Node data:
+
+    ("system", path)           — a system, at `path` (list of sig prefixes)
+    ("sig", path, prefix)      — a signature within the system at `path`
+    """
+
+    def __init__(self, session: Session, **kwargs) -> None:
+        super().__init__("root", **kwargs)
+        self.session = session
+        self.show_root = True
+        self.guide_depth = 3
+
+    def rebuild(self) -> None:
+        chain = self.session.chain
+        self.clear()
+        self.root.set_label(system_label(chain.root, here=chain.location == []))
+        self.root.data = ("system", [])
+        self._fill(self.root, chain.root, [])
+        self.root.expand_all()
+
+    def _fill(self, node: TreeNode, system: System, path: list[str]) -> None:
+        chain = self.session.chain
+        for sig in system.sigs:
+            conn = system.find_connection(sig.prefix)
+            if conn is None:
+                if _visible(sig, self.session.view):
+                    node.add_leaf(sig_label(sig, None), data=("sig", path, sig.prefix))
+                continue
+            sig_node = node.add(sig_label(sig, conn), data=("sig", path, sig.prefix))
+            child_path = path + [sig.prefix]
+            child_node = sig_node.add(
+                system_label(conn.child, here=chain.location == child_path),
+                data=("system", child_path),
+            )
+            self._fill(child_node, conn.child, child_path)

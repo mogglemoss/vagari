@@ -1,0 +1,114 @@
+/* ── Ministry warm dark palette (shared with HARUSPEX) ── */
+$rust:        #C15F3C;
+$rust-dim:    #8A3820;
+$warm-bg:     #1a1815;
+$warm-surface:#201d18;
+$warm-panel:  #252118;
+$warm-text:   #e8e6e3;
+$warm-muted:  #7a756e;
+$warm-border: #3a3530;
+
+Screen {
+    background: $warm-bg;
+    color: $warm-text;
+}
+
+Footer {
+    background: $warm-surface;
+    color: $warm-muted;
+}
+
+#app-header {
+    dock: top;
+    height: 1;
+    background: $warm-surface;
+    color: $warm-muted;
+    padding: 0 1;
+}
+
+#body {
+    height: 1fr;
+}
+
+#chain-tree {
+    width: 3fr;
+    padding: 0 1;
+    background: $warm-bg;
+}
+
+#detail-panel {
+    width: 2fr;
+    height: 100%;
+    padding: 1 2;
+    background: $warm-surface;
+    border-left: solid $warm-border;
+}
+
+#status-line {
+    height: 1;
+    background: $warm-surface;
+    color: $warm-muted;
+    padding: 0 1;
+}
+
+#command-bar {
+    height: 1;
+    background: $warm-panel;
+    border: none;
+    color: $warm-text;
+    padding: 0 1;
+}
+#command-bar:focus {
+    border: none;
+    background: $warm-panel;
+}
+#command-bar > .input--cursor {
+    background: $rust;
+    color: $warm-bg;
+}
+#command-bar > .input--placeholder {
+    color: $warm-muted;
+}
+
+/* Kill the default blue focus ring everywhere */
+*:focus {
+    border: round $warm-border;
+    outline: none;
+}
+
+Tree {
+    background: $warm-bg;
+}
+Tree:focus {
+    border: none;
+    background: $warm-bg;
+}
+Tree > .tree--cursor {
+    background: $rust 25%;
+    color: $warm-text;
+}
+Tree > .tree--highlight {
+    background: $rust 12%;
+}
+Tree > .tree--highlight-line {
+    background: $warm-panel;
+}
+Tree > .tree--guides {
+    color: $warm-border;
+}
+Tree > .tree--guides-hover {
+    color: $rust-dim;
+}
+Tree > .tree--guides-selected {
+    color: $rust;
+}
+
+/* Warm scrollbars — Textual defaults to blue */
+* {
+    scrollbar-color: #5a5550;
+    scrollbar-background: $warm-bg;
+    scrollbar-color-hover: $rust;
+    scrollbar-background-hover: $warm-bg;
+    scrollbar-color-active: $rust;
+    scrollbar-background-active: $warm-bg;
+}
