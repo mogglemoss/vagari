@@ -11,25 +11,19 @@ from vagari.model.chain import Connection, Signature, SigGroup, System, utcnow
 from vagari.model.lifetime import LifeStatus, assess, hours_text
 from vagari.session import Session
 
-# One glyph per site kind, all single-width geometrics. ○ is a hole you can
-# pass through — it pairs with the ◉ YOU marker. ◈/◇ pair relic (filled,
-# treasure) with data (hollow, signal). ≈ is vapor, ▪ is a chunk of rock,
-# · is a signature not yet resolved. ▸ matches HARUSPEX's combat glyph.
-_GLYPHS = {
-    SigGroup.WORMHOLE: "○",
-    SigGroup.COMBAT: "▸",
-    SigGroup.DATA: "◇",
-    SigGroup.RELIC: "◈",
-    SigGroup.GAS: "≈",
-    SigGroup.ORE: "▪",
-    SigGroup.UNKNOWN: "·",
-}
+from vagari.glyphs import GLYPHS as _GLYPHS
+from vagari.glyphs import KIND_WIDTH, kind_word
 
 RUST = "#C15F3C"
 MUTED = "#7a756e"
 TEXT = "#e8e6e3"
 DIM = "#8A3820"
 WARN = "#d4a017"
+FADED = "#4a453e"      # stale filings
+FLARE = "#e8a559"      # fresh filings
+
+NEW_MINUTES = 15       # ● marker while a sig is this fresh
+STALE_HOURS = 6        # dimmed once unconfirmed this long
 
 
 def age_text(since: datetime, now: datetime | None = None) -> str:
@@ -63,16 +57,39 @@ def system_label(system: System, here: bool) -> str:
     return "  ".join(parts)
 
 
-def sig_label(sig: Signature, conn: Connection | None) -> str:
+def sig_label(sig: Signature, conn: Connection | None,
+              now: datetime | None = None) -> str:
+    now = now or utcnow()
+    age_minutes = (now - sig.first_seen).total_seconds() / 60
+    stale_hours = (now - sig.last_seen).total_seconds() / 3600
+    stale = conn is None and stale_hours >= STALE_HOURS
+
     glyph = _GLYPHS[sig.group]
     flag = f"[bold {WARN}]![/bold {WARN}]" if sig.flagged else ""
     name = sig.label or sig.name
     if not name and sig.signal < 100:
         name = f"({sig.signal:.0f}%)"
     color = RUST if sig.group is SigGroup.WORMHOLE else MUTED
-    text = f"[{color}]{glyph}[/{color}] [{TEXT}]{sig.prefix}[/{TEXT}]{flag}"
+    prefix_color = FADED if stale else TEXT
+    name_color = FADED if stale else MUTED
+    kind = kind_word(sig.group, sig.name)
+    kind_color = (
+        f"bold {WARN}" if kind == "GHOST"
+        else RUST if sig.group is SigGroup.WORMHOLE
+        else FADED if stale or sig.group is SigGroup.UNKNOWN
+        else MUTED
+    )
+    kind_cell = f"[{kind_color}]{kind:<{KIND_WIDTH}}[/{kind_color}]"
+    text = (
+        f"[{color}]{glyph}[/{color}] {kind_cell} "
+        f"[{prefix_color}]{sig.prefix}[/{prefix_color}]{flag}"
+    )
     if name:
-        text += f" [{MUTED}]{name}[/{MUTED}]"
+        text += f" [{name_color}]{name}[/{name_color}]"
+    if age_minutes <= NEW_MINUTES:
+        text += f" [{FLARE}]●[/{FLARE}]"
+    if stale:
+        text += f" [{FADED}]({age_text(sig.last_seen, now)} unconfirmed)[/{FADED}]"
     if conn is not None:
         badges = []
         if conn.wh_type:

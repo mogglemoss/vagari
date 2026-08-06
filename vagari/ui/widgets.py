@@ -86,6 +86,11 @@ class VagariHeader(Horizontal):
             "[bold #d4a017]LAZY ARMED[/bold #d4a017]" if lazy_armed else ""
         )
 
+    def flare(self) -> None:
+        """Flare the esca out of cycle — something just happened."""
+        self._esca_frame = 1  # next tick lands on the flare frame
+        self.query_one("#header-mascot", Static).update(_mascot("#e8a559"))
+
     def _tick_esca(self) -> None:
         self._esca_frame = (self._esca_frame + 1) % len(_ESCA_FRAMES)
         self.query_one("#header-mascot", Static).update(

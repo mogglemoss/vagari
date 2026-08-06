@@ -55,6 +55,7 @@ class SystemInfo:
     jcode: str                  # "J105443"
     system_id: int              # EVE system id (for ESI enrichment)
     jclass: str                 # display: "C1".."C13", "Thera", "Sentinel", ...
+    class_key: str              # raw key: "c1".."c13", "thera", drifter names
     effect: str | None
     shattered: bool
     statics: tuple[str, ...]    # wormhole-type codes, e.g. ("Z060",)
@@ -97,6 +98,7 @@ def load_systems() -> dict[str, SystemInfo]:
             jcode=s["name"],
             system_id=s["systemId"],
             jclass=_display_class(s["classKey"]),
+            class_key=s["classKey"],
             effect=s["effect"],
             shattered=s["shattered"],
             statics=statics,
@@ -116,3 +118,32 @@ def lookup_system(key: str) -> SystemInfo | None:
 
 def lookup_wh_type(code: str) -> WormholeType | None:
     return load_wormhole_types().get(code.strip().upper())
+
+
+@lru_cache(maxsize=1)
+def _effect_tables() -> dict[str, dict[str, list[str]]]:
+    return _data("effects.json")
+
+
+@lru_cache(maxsize=1)
+def _effect_power() -> dict[str, int]:
+    """classKey → effect power 1–6 (C13 hits like C6, drifter systems like C2)."""
+    return {
+        c["key"]: c["effectPower"]
+        for c in _data("classes.json")
+        if c.get("effectPower")
+    }
+
+
+def effect_details(effect: str, class_key: str) -> list[tuple[str, str]] | None:
+    """[(attribute, value-at-this-class)] for a weather effect, or None."""
+    table = _effect_tables().get(effect)
+    power = _effect_power().get(class_key)
+    if table is None or power is None:
+        return None
+    index = power - 1
+    return [
+        (attr, values[index])
+        for attr, values in table.items()
+        if index < len(values)
+    ]

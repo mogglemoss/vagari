@@ -30,6 +30,9 @@ _HELP_TEXT = """\
   [bold]flag abc[/bold] / [bold]x[/bold] flag · [bold]del abc[/bold] / [bold]d[/bold] strike
   [bold]eol abc[/bold] / [bold]e[/bold]  toggle end-of-life
   [bold]crit abc[/bold] / [bold]m[/bold] cycle mass state
+  [bold]zaa = abc[/bold]  refile a placeholder's real sig
+  [bold]cull[/bold]       strike holes past book lifetime
+  [bold]c[/bold] / [bold]copy[/bold]   chain as text to clipboard
 
 [#3a3530]── the legend ───────────────────────────[/#3a3530]
   [#C15F3C]○[/#C15F3C] wormhole   [#7a756e]▸ combat  ◇ data  ◈ relic[/#7a756e]

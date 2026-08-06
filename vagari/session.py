@@ -32,6 +32,8 @@ class Session:
     # ESI system-kill enrichment: system_id → SystemActivity; None until fetched.
     activity: dict = field(default_factory=dict, init=False)
     activity_fetched: bool = field(default=False, init=False)
+    # Auto-recon samples per system_id: PvP kills at each fetch, capped.
+    activity_history: dict = field(default_factory=dict, init=False)
     # Follow-me: an arrival the chain can't place — (system name, path we came from).
     pending_arrival: tuple[str, list[str]] | None = field(default=None, init=False)
 
@@ -45,8 +47,10 @@ class Session:
             store.commit(chain)
         return cls(store=store, chain=chain)
 
-    def _commit(self) -> None:
-        self.store.commit(self.chain)
+    def _commit(self, amend: bool = False) -> None:
+        # amend=True for location-only changes: persisted, but not a new
+        # undo step — a long roam should not flush the mapping history.
+        (self.store.amend if amend else self.store.commit)(self.chain)
         self.dirty = True
 
     # -- paste ingestion -----------------------------------------------------
@@ -90,16 +94,16 @@ class Session:
             return self.redo()
         if head in ("top", "home"):
             self.chain.top()
-            self._commit()
+            self._commit(amend=True)
             return f"Relocated to {self.chain.current().name}."
         if head == "up":
             self.chain.up()
-            self._commit()
+            self._commit(amend=True)
             return f"Relocated to {self.chain.current().name}."
         if head == "nav" and rest:
             for prefix in rest:
                 self.chain.nav(prefix)
-            self._commit()
+            self._commit(amend=True)
             return f"Relocated to {self.chain.current().name}."
         if head in VIEWS:
             self.view = head
@@ -135,6 +139,12 @@ class Session:
                                      if _JCODE.match(rest[0]) else " ".join(rest))
         if head == "k162":
             return self.file_k162()
+        if head == "rekey" and len(rest) == 2:
+            return self._rekey(rest[0], rest[1])
+        if len(rest) == 2 and rest[0] == "=" and _PREFIX.match(head):
+            return self._rekey(head, rest[1])
+        if head in ("cull", "cull!"):
+            return self._cull(force=head == "cull!")
         if _PREFIX.match(head) and rest:
             return self._sig_command(head, rest)
         return f"Unrecognised submission: {raw!r}. See `?` for accepted forms."
@@ -240,20 +250,20 @@ class Session:
         for conn in current.connections:
             if conn.child.name == name:
                 chain.location.append(conn.sig_prefix)
-                self._commit()
+                self._commit(amend=True)
                 return f"Followed you through {conn.sig_prefix} to {name}."
 
         if chain.location:
             parent = chain.system_at(chain.location[:-1])
             if parent.name == name:
                 chain.location.pop()
-                self._commit()
+                self._commit(amend=True)
                 return f"Followed you back up to {name}."
 
         found = self._find_system(name)
         if found is not None:
             chain.location = found
-            self._commit()
+            self._commit(amend=True)
             return f"Relocated ◉ YOU to {name} (elsewhere in the chain)."
 
         self.pending_arrival = (name, list(chain.location))
@@ -317,6 +327,80 @@ class Session:
                 return prefix
         raise ChainError("no placeholder prefixes left; the Bureau is impressed")
 
+    def _rekey(self, old: str, new: str) -> str:
+        """Refile a signature under its real prefix — for K162 placeholders
+        whose true signature has since been scanned. Preserves the connection
+        and everything mapped behind it."""
+        if not _PREFIX.match(new):
+            raise ChainError(f"{new!r} is not a signature prefix")
+        here = self.chain.current()
+        sig = here.find_sig(old)
+        if sig is None:
+            raise ChainError(f"no signature {old.upper()[:3]!r} in {here.name}")
+        new_prefix = new.upper()[:3]
+        if here.find_sig(new_prefix) is not None:
+            raise ChainError(f"{new_prefix} already exists here")
+        old_prefix = sig.prefix
+        sig.sig_id = f"{new_prefix}-000"
+        if sig.label == "K162 (unscanned)":
+            sig.label = ""
+        conn = here.find_connection(old_prefix)
+        if conn is not None:
+            conn.sig_prefix = new_prefix
+        self._commit()
+        return f"{old_prefix} refiled as {new_prefix}. The record forgives."
+
+    def _cull(self, force: bool = False) -> str:
+        """Strike connections past their book lifetime (EXPIRED in the tree)."""
+        from vagari.model.lifetime import LifeStatus, assess
+
+        here = self.chain.current()
+        expired = [
+            c.sig_prefix for c in list(here.connections)
+            if assess(c).status is LifeStatus.EXPIRED
+        ]
+        if not expired:
+            return "Nothing past its book lifetime here."
+        removed, blocked = [], []
+        for prefix in expired:
+            try:
+                here.remove_sig(prefix, force=force)
+                removed.append(prefix)
+            except ChainError:
+                blocked.append(prefix)
+        if removed:
+            self._commit()
+        parts = []
+        if removed:
+            parts.append(f"Culled: {' '.join(removed)}.")
+        if blocked:
+            parts.append(
+                f"Retained (mapped children): {' '.join(blocked)} — `cull!` to force."
+            )
+        return " ".join(parts)
+
+    # -- activity history (auto-recon sampling) ------------------------------
+
+    def sample_activity(self, cap: int = 24) -> None:
+        """Record a per-system PvP-kill sample for every system in the chain."""
+        systems: list = []
+
+        def walk(system) -> None:
+            systems.append(system)
+            for conn in system.connections:
+                walk(conn.child)
+
+        walk(self.chain.root)
+        for system in systems:
+            info = lookup_system(system.name)
+            if info is None:
+                continue
+            act = self.activity.get(info.system_id)
+            pvp = (act.ship_kills + act.pod_kills) if act else 0
+            history = self.activity_history.setdefault(info.system_id, [])
+            history.append(pvp)
+            del history[:-cap]
+
     def _name_system(self, system, name: str) -> str:
         system.name = name
         info = lookup_system(name)
@@ -331,7 +415,7 @@ class Session:
         """Set the current location to an already-mapped path (tree navigation)."""
         self.chain.system_at(path)  # validates
         self.chain.location = list(path)
-        self._commit()
+        self._commit(amend=True)
         return f"Relocated to {self.chain.current().name}."
 
     # -- undo / redo ---------------------------------------------------------

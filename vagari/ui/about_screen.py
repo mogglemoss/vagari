@@ -38,8 +38,13 @@ via the Bureau's spookyspace ingest.[/#7a756e]
 INHALATION circulars, as codified in
 PANTOSCOPE's probe-scan parser.[/#7a756e]
 
-[#e8e6e3]Sibling instruments[/#e8e6e3] [#7a756e]HARUSPEX · AUSPEX ·
-RETROSPEX · AUGUR — observance.app[/#7a756e]
+[#e8e6e3]Sibling instruments[/#e8e6e3] [#7a756e]HARUSPEX ·
+AUSPEX · RETROSPEX · PANTOSCOPE · PERISCOPE[/#7a756e]
+
+[#e8e6e3]The Ministry[/#e8e6e3] [#C15F3C]observance.app/ministry[/#C15F3C]
+[#7a756e]full instrument roster on file[/#7a756e]
+[#e8e6e3]Pantoscope[/#e8e6e3] [#C15F3C]observance.app[/#C15F3C]
+[#e8e6e3]Periscope[/#e8e6e3] [#C15F3C]periscope.observance.app[/#C15F3C]
 
 [#3a3530]─────────────────────────────────────────[/#3a3530]
 

@@ -194,6 +194,17 @@ no price checks by design. Rendered in the sig detail panel. Plus: animated masc
 header (HARUSPEX genus), about screen (`a`), Ministry-issue command palette, and
 random Bureau farewells on quit. 89 tests.
 
+**M7 — polish + operability.** ✅ DONE (2026-08-06). Kind column in the tree (WORMHOLE/
+RELIC/DATA/GHOST/GAS/COMBAT/UNFILED — ghost sites detected by name); plain-text chain
+export (`c`/`copy`, bashmapper's shareability restored); K162 placeholder re-key
+(`zaa = abc`, preserves mapped subtree); location-only commits amend instead of append
+(roaming no longer burns undo history); stale sigs dim after 6h unconfirmed, fresh ones
+carry a ● for 15 min; `cull` strikes holes past book lifetime (guarded, `cull!`
+forces); lifetime/mass gauges in the detail panel; weather-effect attribute tables by
+class (effects.json + classes.json — C13 hits like C6); auto-recon every 10 min with a
+per-system PvP-trend sparkline; esca flares on events; about screen (Ministry links:
+observance.app/ministry roster, PANTOSCOPE, PERISCOPE). 104 tests.
+
 ## Risks / open items
 
 - **Probe-scanner clipboard format drift / localization**: parse defensively, keep

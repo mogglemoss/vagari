@@ -10,6 +10,7 @@ from vagari.parsers.catalog import lookup_system, lookup_wh_type
 from vagari.parsers.site_intel import classify_site, gas_contents
 from vagari.session import Session
 from vagari.ui.chain_tree import DIM, MUTED, RUST, TEXT, WARN, age_text
+from vagari.ui.graphs import gauge, spark
 
 EMPTY_STATE = f"""\
 [{MUTED}]FORM ACB-01 (CHAIN CUSTODY)[/{MUTED}]
@@ -47,6 +48,11 @@ class DetailPanel(Static):
         if system.effect:
             lines.append(f"[{WARN}]{system.effect}[/{WARN}]")
         info = lookup_system(system.name)
+        if system.effect and info is not None:
+            from vagari.parsers.catalog import effect_details
+
+            for attr, value in effect_details(system.effect, info.class_key) or []:
+                lines.append(f"  [{MUTED}]{attr}[/{MUTED}] [{TEXT}]{value}[/{TEXT}]")
         if info is not None:
             extras = []
             if info.region:
@@ -64,6 +70,13 @@ class DetailPanel(Static):
                 )
             elif self.session.activity_fetched:
                 lines.append(f"[{MUTED}]ACTIVITY (last hour): none observed[/{MUTED}]")
+            history = self.session.activity_history.get(info.system_id, [])
+            if len(history) >= 2:
+                trend_color = WARN if history[-1] > 0 else MUTED
+                lines.append(
+                    f"[{MUTED}]TREND (PvP, per recon):[/{MUTED}] "
+                    f"[{trend_color}]{spark(history)}[/{trend_color}]"
+                )
         lines.append("")
         if system.sigs:
             lines.append(f"[{MUTED}]SIGNATURES ({len(system.sigs)})[/{MUTED}]")
@@ -129,23 +142,29 @@ class DetailPanel(Static):
                 if life.remaining_hours is not None:
                     if life.status is LifeStatus.EXPIRED:
                         lines.append(
-                            f"[bold {DIM}]PAST BOOK LIFETIME — verify and sweep[/bold {DIM}]"
+                            f"[bold {DIM}]PAST BOOK LIFETIME — verify and cull[/bold {DIM}]"
                         )
                     else:
                         color = WARN if life.status in (
                             LifeStatus.WANING, LifeStatus.EOL
                         ) else MUTED
+                        fraction = (
+                            life.remaining_hours / life.total_hours
+                            if life.total_hours else 0
+                        )
                         lines.append(
-                            f"[{color}]≤{hours_text(life.remaining_hours)} remaining "
-                            f"(upper bound from first mapping)[/{color}]"
+                            f"[{color}]LIFE {gauge(fraction)} "
+                            f"≤{hours_text(life.remaining_hours)} remaining "
+                            f"(upper bound)[/{color}]"
                         )
             else:
                 lines.append(f"[{MUTED}]open {age_text(conn.opened_at)}[/{MUTED}]")
-            status = []
-            if conn.mass.value != "fresh":
-                status.append(f"[{WARN}]MASS {conn.mass.value.upper()}[/{WARN}]")
+            mass_fraction = {"fresh": 1.0, "reduced": 0.5, "critical": 0.1}[conn.mass.value]
+            mass_color = MUTED if conn.mass.value == "fresh" else WARN
+            lines.append(
+                f"[{mass_color}]MASS {gauge(mass_fraction, cells=3)} "
+                f"{conn.mass.value.upper()}[/{mass_color}]"
+            )
             if conn.eol:
-                status.append(f"[bold {DIM}]END OF LIFE[/bold {DIM}]")
-            if status:
-                lines.append(" ".join(status))
+                lines.append(f"[bold {DIM}]END OF LIFE[/bold {DIM}]")
         self.update("\n".join(lines))

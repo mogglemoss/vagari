@@ -94,6 +94,18 @@ class Store:
             self._path(name, old).unlink()
         return snap_id
 
+    def amend(self, chain: Chain) -> int:
+        """Overwrite the current head snapshot instead of creating a new one.
+
+        Used for location-only changes (nav, follow-me): a pilot roaming 30
+        jumps should not burn 30 undo slots.
+        """
+        head = self._head(chain.name)
+        if head is None or not self._path(chain.name, head).exists():
+            return self.commit(chain)
+        self._path(chain.name, head).write_text(json.dumps(chain.to_dict(), indent=1))
+        return head
+
     def undo(self, name: str) -> Chain | None:
         head = self._head(name)
         if head is None:

@@ -61,6 +61,7 @@ class MapperApp(App):
         Binding("x", "sig_cmd('flag')", "Flag", show=False),
         Binding("d", "sig_cmd('del')", "Strike", show=False),
         Binding("l", "arm_lazy", "Lazy", show=True),
+        Binding("c", "copy_chain", "Copy", show=True),
         Binding("k", "file_k162", "File K162", show=False),
         Binding("a", "show_about", "About", show=False),
         Binding("q", "quit", "Quit", show=True),
@@ -119,6 +120,13 @@ class MapperApp(App):
             "Return to root", "Move ◉ YOU to the top of the chain", self.action_go_top
         )
         yield SystemCommand(
+            "Copy chain", "Plain-text tree to the clipboard", self.action_copy_chain
+        )
+        yield SystemCommand(
+            "Cull expired", "Strike holes past their book lifetime",
+            lambda: self._after_engine(self.session.execute("cull")),
+        )
+        yield SystemCommand(
             "About", "The instrument's papers", self.action_show_about
         )
         yield SystemCommand("Quit", "Close the instrument", self.action_quit)
@@ -158,6 +166,12 @@ class MapperApp(App):
                 )
         # Ages and lifetime countdowns tick; cursor position is preserved.
         self.set_interval(60, self._tick)
+        if self.recon_enabled:
+            # Auto-recon: refresh activity and record a trend sample.
+            self.set_interval(600, self._auto_recon)
+
+    def _auto_recon(self) -> None:
+        self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
 
     async def _on_system_change(self, name: str) -> None:
         message = self.session.follow(name)
@@ -176,6 +190,7 @@ class MapperApp(App):
             return
         self.session.activity = activity
         self.session.activity_fetched = True
+        self.session.sample_activity()
         node = self.query_one(ChainTree).cursor_node
         self.query_one(DetailPanel).show_node(node.data if node else None)
         self.status(f"Reconnaissance filed: activity for {len(activity)} systems.")
@@ -198,6 +213,7 @@ class MapperApp(App):
     def _after_engine(self, message: str) -> None:
         self.status(message)
         if self.session.dirty:
+            self.query_one(VagariHeader).flare()
             self.refresh_all()
 
     # -- paste ---------------------------------------------------------------
@@ -285,6 +301,16 @@ class MapperApp(App):
 
     def action_file_k162(self) -> None:
         self._after_engine(self.session.file_k162())
+
+    def action_copy_chain(self) -> None:
+        from vagari.export import export_text
+
+        text = export_text(self.session.chain, self.session.view)
+        self.copy_to_clipboard(text)
+        self.status(
+            f"Chain of custody copied ({len(text.splitlines())} lines). "
+            "Distribute responsibly."
+        )
 
     def action_arm_lazy(self) -> None:
         self._after_engine(self.session.execute("lazy"))

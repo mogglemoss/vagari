@@ -42,6 +42,17 @@ def test_lookup_variants():
     assert lookup_system("J999999") is None
 
 
+def test_effect_details_scale_with_class():
+    from vagari.parsers.catalog import effect_details
+
+    c1 = dict(effect_details("Magnetar", "c1"))
+    c13 = dict(effect_details("Magnetar", "c13"))
+    assert c1["Drone Tracking"] == "-15%"
+    assert c13["Drone Tracking"] == "-50%"  # C13 hits like C6
+    assert effect_details("Magnetar", "hs") is None
+    assert effect_details("Nice Weather", "c1") is None
+
+
 def test_wormhole_types():
     n110 = lookup_wh_type("N110")
     assert n110 is not None

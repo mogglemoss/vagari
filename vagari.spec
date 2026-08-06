@@ -16,6 +16,7 @@ a = Analysis(
         ("vagari/data/systems.json", "vagari/data"),
         ("vagari/data/wormhole_types.json", "vagari/data"),
         ("vagari/data/effects.json", "vagari/data"),
+        ("vagari/data/classes.json", "vagari/data"),
         ("vagari/data/meta.json", "vagari/data"),
         ("vagari/data/ATTRIBUTION.md", "vagari/data"),
         ("vagari/ui/theme.tcss", "vagari/ui"),

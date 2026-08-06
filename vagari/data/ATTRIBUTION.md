@@ -11,6 +11,8 @@ version, and generation date).
 - `wormhole_types.json` — 90 wormhole types: code, target class, static or
   wandering, total mass, per-jump mass, lifetime hours, mass regen, size.
 - `effects.json` — weather effect bonus tables by system class.
+- `classes.json` — class metadata including effect power (C13 effects hit
+  like C6; drifter systems like C2).
 
 The interaction model of this app is inspired by
 [chloroken/bashmapper](https://github.com/chloroken/bashmapper) (MIT,
