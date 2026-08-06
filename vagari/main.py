@@ -64,6 +64,7 @@ class MapperApp(App):
         Binding("c", "copy_chain", "Copy", show=True),
         Binding("k", "file_k162", "File K162", show=False),
         Binding("a", "show_about", "About", show=False),
+        Binding("slash", "start_search", "Find", show=False),
         Binding("q", "quit", "Quit", show=True),
     ]
 
@@ -78,6 +79,7 @@ class MapperApp(App):
         self.session = session or Session.open(Store())
         self.recon_enabled = recon    # tests disable the network fetch
         self.follow_enabled = follow  # tests disable the chatlog tailer
+        self._search: tuple[str, int] | None = None  # (query, match index)
 
     def get_system_commands(self, screen):
         """Curated Bureau commands for the palette (Ctrl+P) — replaces
@@ -121,6 +123,13 @@ class MapperApp(App):
         )
         yield SystemCommand(
             "Copy chain", "Plain-text tree to the clipboard", self.action_copy_chain
+        )
+        yield SystemCommand(
+            "Find", "Search systems, sigs, and labels", self.action_start_search
+        )
+        yield SystemCommand(
+            "Intel: zKill dossier", "Killboard stats for the current system",
+            self._request_intel,
         )
         yield SystemCommand(
             "Cull expired", "Strike holes past their book lifetime",
@@ -218,6 +227,8 @@ class MapperApp(App):
         if self.session.dirty:
             self.query_one(VagariHeader).flare()
             self.refresh_all()
+            if self.recon_enabled and self.session.unresolved_kspace_names():
+                self.run_worker(self._resolve_kspace(), exclusive=True, group="kspace")
 
     # -- paste ---------------------------------------------------------------
 
@@ -241,6 +252,13 @@ class MapperApp(App):
         if text == "recon":
             self.status("Reconnaissance dispatched…")
             self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
+            return
+        if text == "intel":
+            self._request_intel()
+            return
+        if text.startswith("/") or text.lower().startswith("find "):
+            query = text[1:] if text.startswith("/") else text[5:]
+            self._run_search(query.strip())
             return
         if text.startswith(":"):
             text = text[1:].strip()
@@ -303,6 +321,72 @@ class MapperApp(App):
 
     def action_show_about(self) -> None:
         self.push_screen(AboutScreen())
+
+    def action_start_search(self) -> None:
+        bar = self.query_one("#command-bar", Input)
+        bar.focus()
+        bar.value = "/"
+        bar.cursor_position = 1
+
+    def _run_search(self, query: str) -> None:
+        if not query:
+            self.status("Find what? `/query` searches names, prefixes, labels.")
+            return
+        matches = self.session.find_matches(query)
+        if not matches:
+            self._search = None
+            self.status(f"No filings match {query!r}.")
+            return
+        if self._search and self._search[0] == query:
+            index = (self._search[1] + 1) % len(matches)
+        else:
+            index = 0
+        self._search = (query, index)
+        tree = self.query_one(ChainTree)
+        tree._restore_cursor(matches[index])
+        tree.focus()
+        self.query_one(DetailPanel).show_node(matches[index])
+        again = " — `/` and Enter again for the next" if len(matches) > 1 else ""
+        self.status(f"Match {index + 1}/{len(matches)} for {query!r}{again}.")
+
+    def _request_intel(self) -> None:
+        from vagari.parsers.catalog import lookup_system
+
+        current = self.session.chain.current()
+        info = lookup_system(current.name)
+        kinfo = self.session.kspace.get(current.name)
+        system_id = info.system_id if info else (kinfo.system_id if kinfo else None)
+        if system_id is None:
+            self.status(f"No system id on file for {current.name} — name it first.")
+            return
+        self.status(f"Requesting killboard intel for {current.name}…")
+        self.run_worker(self._fetch_intel(current.name, system_id), group="intel")
+
+    async def _fetch_intel(self, name: str, system_id: int) -> None:
+        from vagari.enrichers.zkill import fetch_system_stats
+
+        stats = await fetch_system_stats(system_id)
+        if stats is None:
+            self.status("zKillboard unavailable. The Bureau does not speculate offline.")
+            return
+        self.session.zkill_stats[system_id] = stats
+        node = self.query_one(ChainTree).cursor_node
+        self.query_one(DetailPanel).show_node(node.data if node else None)
+        self.status(
+            f"Intel filed for {name}: {stats.ships_destroyed:,} ships destroyed "
+            f"all-time · {stats.active_characters} recently active hunters."
+        )
+
+    async def _resolve_kspace(self) -> None:
+        from vagari.enrichers.kspace import resolve_systems
+
+        names = self.session.unresolved_kspace_names()
+        if not names:
+            return
+        resolved = await resolve_systems(names)
+        if resolved:
+            self.session.kspace.update(resolved)
+            self.refresh_all()
 
     def action_focus_command(self) -> None:
         self.query_one("#command-bar", Input).focus()

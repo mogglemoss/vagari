@@ -275,6 +275,64 @@ async def test_wormhole_type_mass_in_detail(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_search_moves_cursor_and_cycles(tmp_path):
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        await pilot.press("colon")
+        await pilot.press(*"qlm J154535")
+        await pilot.press("enter")
+        await pilot.pause()
+
+        await pilot.press("slash")
+        await pilot.press(*"J154535")
+        await pilot.press("enter")
+        await pilot.pause()
+        tree = app.query_one(ChainTree)
+        assert tree.cursor_node.data == ("system", ["QLM"])
+        status = str(app.query_one("#status-line", Static).content)
+        assert "Match 1/" in status
+
+        # "j1" hits both systems; repeating the query cycles between them.
+        await pilot.press("slash")
+        await pilot.press(*"j1")
+        await pilot.press("enter")
+        await pilot.pause()
+        first = app.query_one(ChainTree).cursor_node.data
+        await pilot.press("slash")
+        await pilot.press(*"j1")
+        await pilot.press("enter")
+        await pilot.pause()
+        second = app.query_one(ChainTree).cursor_node.data
+        assert first != second
+
+
+@pytest.mark.asyncio
+async def test_kspace_rendering(tmp_path):
+    from vagari.enrichers.kspace import KSpaceInfo
+    from vagari.ui.detail_panel import DetailPanel
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.session.follow("Jita")
+        app.session.file_k162()
+        app.session.kspace["Jita"] = KSpaceInfo(30000142, 0.9459, "The Forge")
+        app.refresh_all()
+        await pilot.pause()
+        assert "0.9" in tree_text(app.query_one(ChainTree))
+
+        from vagari.enrichers.zkill import SystemKillStats
+
+        app.session.zkill_stats[30000142] = SystemKillStats(1_538_343, 795, 1354)
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("system", ["ZAA"]))
+        text = str(panel.content)
+        assert "security 0.9" in text and "The Forge" in text
+        assert "1,538,343 ships destroyed" in text
+
+
+@pytest.mark.asyncio
 async def test_view_filter(tmp_path):
     app = make_app(tmp_path)
     async with app.run_test() as pilot:

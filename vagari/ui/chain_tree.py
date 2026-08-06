@@ -43,13 +43,17 @@ def _visible(sig: Signature, view: str) -> bool:
     return True
 
 
-def system_label(system: System, here: bool) -> str:
+def system_label(system: System, here: bool, kinfo=None) -> str:
     parts = [f"[bold {TEXT}]{system.name}[/bold {TEXT}]"]
     meta = []
     if system.jclass:
         meta.append(system.jclass + (f"+{system.statics}" if system.statics else ""))
     if system.effect:
         meta.append(system.effect)
+    if kinfo is not None:
+        sec_color = {"H": TEXT, "L": WARN, "N": DIM}[kinfo.band]
+        parts.append(f"[{sec_color}]{kinfo.sec_display}[/{sec_color}]")
+        meta.append(kinfo.region)
     if meta:
         parts.append(f"[{MUTED}]{' · '.join(meta)}[/{MUTED}]")
     if here:
@@ -133,7 +137,10 @@ class ChainTree(Tree):
         chain = self.session.chain
         cursor_data = self.cursor_node.data if self.cursor_node else None
         self.clear()
-        self.root.set_label(system_label(chain.root, here=chain.location == []))
+        self.root.set_label(
+            system_label(chain.root, here=chain.location == [],
+                         kinfo=self.session.kspace.get(chain.root.name))
+        )
         self.root.data = ("system", [])
         self._fill(self.root, chain.root, [])
         self.root.expand_all()
@@ -165,7 +172,8 @@ class ChainTree(Tree):
             sig_node = node.add(sig_label(sig, conn), data=("sig", path, sig.prefix))
             child_path = path + [sig.prefix]
             child_node = sig_node.add(
-                system_label(conn.child, here=chain.location == child_path),
+                system_label(conn.child, here=chain.location == child_path,
+                             kinfo=self.session.kspace.get(conn.child.name)),
                 data=("system", child_path),
             )
             self._fill(child_node, conn.child, child_path)

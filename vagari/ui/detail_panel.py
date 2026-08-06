@@ -56,7 +56,25 @@ class DetailPanel(Static):
             lines.append(f"[{TEXT}]{system.jclass}{statics}[/{TEXT}]")
         if system.effect:
             lines.append(f"[{WARN}]{system.effect}[/{WARN}]")
+        kinfo = self.session.kspace.get(system.name)
+        if kinfo is not None:
+            sec_color = {"H": TEXT, "L": WARN, "N": DIM}[kinfo.band]
+            lines.append(
+                f"[{sec_color}]security {kinfo.sec_display}[/{sec_color}] "
+                f"[{MUTED}]· region {kinfo.region}[/{MUTED}]"
+            )
+        zstats = None
+        if kinfo is not None:
+            zstats = self.session.zkill_stats.get(kinfo.system_id)
         info = lookup_system(system.name)
+        if info is not None and zstats is None:
+            zstats = self.session.zkill_stats.get(info.system_id)
+        if zstats is not None:
+            lines.append(
+                f"[{MUTED}]ZKILL: {zstats.ships_destroyed:,} ships destroyed "
+                f"all-time · {zstats.active_characters} active hunters · "
+                f"{zstats.active_kills} recent kills[/{MUTED}]"
+            )
         if system.effect and info is not None:
             from vagari.parsers.catalog import effect_details
 

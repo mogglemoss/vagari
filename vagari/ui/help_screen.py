@@ -49,6 +49,13 @@ _HELP_TEXT = """\
   [#C15F3C]○[/#C15F3C] wormhole   [#7a756e]▸ combat  ◇ data  ◈ relic[/#7a756e]
   [#7a756e]≈ gas  ▪ ore  · unresolved  ![/#7a756e] flagged
 
+[#3a3530]── finding things ───────────────────────[/#3a3530]
+  [bold]/query[/bold]     find a system, sig, or label
+             (repeat to cycle the matches)
+  [bold]intel[/bold]      zKill dossier for this system
+  [#7a756e]k-space exits gain sec + region on file
+  automatically once named[/#7a756e]
+
 [#3a3530]── views & custody ──────────────────────[/#3a3530]
   [bold]1[/bold]/[bold]2[/bold]/[bold]3[/bold]      full / paths / gas
   [bold]z[/bold] / [bold]Z[/bold]      undo / redo (unbounded)

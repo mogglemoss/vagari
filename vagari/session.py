@@ -34,6 +34,10 @@ class Session:
     activity_fetched: bool = field(default=False, init=False)
     # Auto-recon samples per system_id: PvP kills at each fetch, capped.
     activity_history: dict = field(default_factory=dict, init=False)
+    # K-space exit enrichment: system name → KSpaceInfo (session cache).
+    kspace: dict = field(default_factory=dict, init=False)
+    # zKill per-system stats: system_id → SystemKillStats (session cache).
+    zkill_stats: dict = field(default_factory=dict, init=False)
     # Follow-me: an arrival the chain can't place — (system name, path we came from).
     pending_arrival: tuple[str, list[str]] | None = field(default=None, init=False)
 
@@ -304,6 +308,44 @@ class Session:
             f"Filed {name} as K162 via placeholder {prefix} — relabel it when "
             "you scan the real signature."
         )
+
+    def find_matches(self, query: str) -> list[tuple]:
+        """Tree-node data tuples matching a query: system names first,
+        then signatures by prefix, site name, or label."""
+        q = query.strip().lower()
+        if not q:
+            return []
+        matches: list[tuple] = []
+        queue: list[tuple[list[str], object]] = [([], self.chain.root)]
+        while queue:
+            path, system = queue.pop(0)
+            if q in system.name.lower():
+                matches.append(("system", path))
+            for sig in system.sigs:
+                haystack = f"{sig.prefix} {sig.name} {sig.label}".lower()
+                if q in haystack:
+                    matches.append(("sig", path, sig.prefix))
+            for conn in system.connections:
+                queue.append((path + [conn.sig_prefix], conn.child))
+        return matches
+
+    def unresolved_kspace_names(self) -> list[str]:
+        """Chain system names that are neither catalogued J-space nor
+        already resolved — candidates for ESI k-space lookup."""
+        names: list[str] = []
+        queue = [self.chain.root]
+        while queue:
+            system = queue.pop(0)
+            name = system.name
+            if (
+                name not in ("HOME", "?")
+                and name not in self.kspace
+                and lookup_system(name) is None
+                and name not in names
+            ):
+                names.append(name)
+            queue.extend(conn.child for conn in system.connections)
+        return names
 
     def _find_system(self, name: str) -> list[str] | None:
         """Breadth-first search for a system by name; returns its path."""

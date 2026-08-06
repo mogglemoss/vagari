@@ -24,6 +24,8 @@ _SYSTEM_CHANGED = "Channel changed to Local :"
 # Documents path; then Linux Steam Proton, then Steam Flatpak).
 LOG_CANDIDATES: list[Path] = [
     Path.home() / "Documents" / "EVE" / "logs" / "Chatlogs",
+    # Windows commonly redirects Documents into OneDrive.
+    Path.home() / "OneDrive" / "Documents" / "EVE" / "logs" / "Chatlogs",
     Path.home() / ".local" / "share" / "Steam" / "steamapps" / "compatdata" / "8500"
     / "pfx" / "drive_c" / "users" / "steamuser" / "My Documents" / "EVE" / "logs"
     / "Chatlogs",

@@ -205,6 +205,14 @@ class (effects.json + classes.json — C13 hits like C6); auto-recon every 10 mi
 per-system PvP-trend sparkline; esca flares on events; about screen (Ministry links:
 observance.app/ministry roster, PANTOSCOPE, PERISCOPE). 104 tests.
 
+**M8 — find, exits, intel.** ✅ DONE (2026-08-06). `/query` search across system names,
+sig prefixes, site names, and labels with match cycling; k-space exits auto-resolve
+security + region via public ESI once named (rounded-sec banding — 0.45 rounds to
+highsec; session cache, fail-silent); `intel` files a zKillboard dossier for the
+current system (all-time ships destroyed, active hunters, recent kills — manual, so
+politely rate-limited by design); OneDrive Documents added to Windows chatlog
+detection. Both endpoints live-verified before implementation. 116 tests.
+
 ## Risks / open items
 
 - **Probe-scanner clipboard format drift / localization**: parse defensively, keep

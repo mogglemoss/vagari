@@ -47,6 +47,8 @@ THE BUREAU IS MERELY NOTING.
 
 **Sites come pre-assessed.** Select any scanned signature and the Bureau files its verdict per the ARCHAEOLOGY and INHALATION circulars: relic and data tiers with their difficulty grades, sleeper sites with their class bands and a warning about the escort, gas reservoirs with their exact fullerite contents down to the unit, and the hazardous paperwork — **TIMED** ghost sites, **CACHE** sleeper caches, **TRAPPED** and **ALARMED** facilities — marked accordingly. The Bureau knows what a Vital Core Reservoir holds. It declines to tell you what it is worth; appraisal is a market activity.
 
+**Finding things.** `/query` searches system names, signature prefixes, site names, and your own labels; repeat it to cycle matches. Name a k-space exit and it quietly gains its security status and region from public ESI. `intel` files a zKillboard dossier on the current system — all-time ships destroyed and recently active hunters — on request only; the Bureau does not pester killboards.
+
 **Everything is undoable.** Every mutation is a snapshot; `z` and `Z` walk the record backward and forward without limit of consequence. Multiple chains of custody are maintained with `chain <name>`. The Bureau has never lost a chain. The Bureau has, on occasion, misplaced a pilot.
 
 ---
