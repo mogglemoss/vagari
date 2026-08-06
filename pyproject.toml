@@ -1,6 +1,6 @@
 [project]
 name = "vagari"
-version = "0.7.0"
+version = "0.8.0"
 description = "Anoikis Cartographic Bureau — a terminal wormhole chain mapper for EVE Online"
 readme = "README.md"
 requires-python = ">=3.11"
