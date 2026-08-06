@@ -8,6 +8,7 @@ from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 
 from tuimapper.model.chain import Connection, Signature, SigGroup, System, utcnow
+from tuimapper.model.lifetime import LifeStatus, assess, hours_text
 from tuimapper.session import Session
 
 _GLYPHS = {
@@ -72,7 +73,20 @@ def sig_label(sig: Signature, conn: Connection | None) -> str:
         badges = []
         if conn.wh_type:
             badges.append(conn.wh_type)
-        badges.append(age_text(conn.opened_at))
+        life = assess(conn)
+        if life.remaining_hours is not None:
+            life_color = {
+                LifeStatus.HEALTHY: MUTED,
+                LifeStatus.WANING: WARN,
+                LifeStatus.EXPIRED: DIM,
+                LifeStatus.EOL: DIM,
+            }.get(life.status, MUTED)
+            label = "EXPIRED?" if life.status is LifeStatus.EXPIRED else (
+                f"≤{hours_text(life.remaining_hours)}"
+            )
+            badges.append(f"[{life_color}]{label}[/{life_color}]")
+        else:
+            badges.append(age_text(conn.opened_at))
         if conn.mass.value != "fresh":
             badges.append(conn.mass.value.upper())
         if conn.eol:
@@ -96,11 +110,28 @@ class ChainTree(Tree):
 
     def rebuild(self) -> None:
         chain = self.session.chain
+        cursor_data = self.cursor_node.data if self.cursor_node else None
         self.clear()
         self.root.set_label(system_label(chain.root, here=chain.location == []))
         self.root.data = ("system", [])
         self._fill(self.root, chain.root, [])
         self.root.expand_all()
+        if cursor_data is not None:
+            self._restore_cursor(cursor_data)
+
+    def _restore_cursor(self, data: tuple) -> None:
+        def walk(node):
+            if node.data == data:
+                return node
+            for child in node.children:
+                found = walk(child)
+                if found is not None:
+                    return found
+            return None
+
+        node = walk(self.root)
+        if node is not None:
+            self.move_cursor(node)
 
     def _fill(self, node: TreeNode, system: System, path: list[str]) -> None:
         chain = self.session.chain

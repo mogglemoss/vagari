@@ -40,13 +40,31 @@ def build_session(tmp: Path) -> Session:
         "RRB-300\tCosmic Signature\t\t\t34.2%\t19.0 AU\n"
     )
     session.execute("kwv K162")
+
+    # Backdate the N110 so the lifetime countdown shows a waning hole,
+    # and file some reconnaissance so the detail panel has activity data.
+    from datetime import timedelta
+
+    from tuimapper.enrichers.activity import SystemActivity
+    from tuimapper.parsers.catalog import lookup_system
+
+    session.chain.top()
+    session.execute("nav qlm")
+    n110 = session.chain.current().find_connection("QLM")
+    n110.opened_at -= timedelta(hours=21, minutes=30)
+    session.chain.top()
+    session.activity = {
+        lookup_system("J164417").system_id: SystemActivity(3, 1, 12),
+        lookup_system("J154535").system_id: SystemActivity(0, 0, 44),
+    }
+    session.activity_fetched = True
     return session
 
 
 async def shoot() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         session = build_session(Path(tmp))
-        app = MapperApp(session=session)
+        app = MapperApp(session=session, recon=False)
         async with app.run_test(size=(120, 36)) as pilot:
             await pilot.pause()
             app.save_screenshot(str(OUT / "shot_chain.svg"))

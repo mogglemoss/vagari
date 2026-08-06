@@ -158,11 +158,14 @@ full/paths/gas views, unbounded undo/redo, named chains, help overlay, Ministry 
 (Anoikis Cartographic Bureau). 54 tests incl. headless pilot smoke tests; SVG
 screenshots via `scripts/screenshot.py`. Local tag v0.1.0.
 
-**M3 — enrichment + timers.** Catalog auto-label on jcode; wormhole lifetime estimates
-from `wormhole_types.json` (per-type lifetime/mass already bundled); ESI/zKill optional
-enrichment of inhabitants for k-space exits (public endpoints only, fail-silent
-offline) — lift patterns from haruspex `enrichers/` and mogglemoss/retrospex (private;
-richer killboard integration). Exit: v0.2.
+**M3 — enrichment + timers.** ✅ DONE (2026-08-06). Lifetime countdowns from
+`wormhole_types.json` (HEALTHY/WANING/EXPIRED/EOL, tree badges + detail panel; upper
+bound from first mapping, in-game EOL caps at 4h); region/shattered from catalog in
+detail; ESI system-kills enrichment (one public bulk request, fail-silent offline,
+`recon` command + fetch on launch) showing per-system hostile/NPC activity. 65 tests;
+live ESI path verified. Deferred to M4+: per-pilot/inhabitant enrichment via zKill —
+lift patterns from haruspex `enrichers/` and mogglemoss/retrospex when we get there.
+Exit: v0.2 (tagged locally).
 
 **M4 — the map follows you.** Port the chatlog tailer; on system-change event, move
 `◉ YOU` along the chain if the destination is mapped; if unmapped, offer one-key "create

@@ -29,6 +29,9 @@ class Session:
     lazy_armed: bool = False
     last_report: ReconcileReport | None = None
     dirty: bool = field(default=False, init=False)  # set when chain changed (UI refresh)
+    # ESI system-kill enrichment: system_id → SystemActivity; None until fetched.
+    activity: dict = field(default_factory=dict, init=False)
+    activity_fetched: bool = field(default=False, init=False)
 
     # -- lifecycle -----------------------------------------------------------
 

@@ -34,6 +34,7 @@ _HELP_TEXT = """\
   [bold]1[/bold]/[bold]2[/bold]/[bold]3[/bold]      full / paths / gas
   [bold]z[/bold] / [bold]Z[/bold]      undo / redo (unbounded)
   [bold]chain <name>[/bold] switch chain of custody
+  [bold]recon[/bold]      refresh system activity (ESI)
   [bold]:[/bold]        focus the submission line
   [bold]?[/bold]        show / close this reference
   [bold]q[/bold]        quit

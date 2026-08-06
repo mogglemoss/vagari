@@ -18,7 +18,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def make_app(tmp_path) -> MapperApp:
     session = Session.open(Store(base_dir=tmp_path / "state"))
     session.chain.root.name = "J105443"
-    return MapperApp(session=session)
+    return MapperApp(session=session, recon=False)
 
 
 def tree_text(tree: ChainTree) -> str:
@@ -91,6 +91,24 @@ async def test_help_screen(tmp_path):
         await pilot.press("escape")
         await pilot.pause()
         assert not isinstance(app.screen, HelpScreen)
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_shows_activity(tmp_path):
+    from tuimapper.enrichers.activity import SystemActivity
+    from tuimapper.parsers.catalog import lookup_system
+    from tuimapper.ui.detail_panel import DetailPanel
+
+    app = make_app(tmp_path)
+    sid = lookup_system("J105443").system_id
+    app.session.activity = {sid: SystemActivity(ship_kills=3, pod_kills=1, npc_kills=5)}
+    app.session.activity_fetched = True
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("system", []))
+        text = str(panel.content)
+        assert "ACTIVITY" in text and "3 ship" in text
 
 
 @pytest.mark.asyncio

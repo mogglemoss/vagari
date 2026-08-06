@@ -1,10 +1,11 @@
 [project]
 name = "tuimapper"
 version = "0.1.0.dev0"
-description = "HARUSPEX CARTOGRAPHY DIVISION — a terminal wormhole chain mapper for EVE Online"
+description = "Anoikis Cartographic Bureau — a terminal wormhole chain mapper for EVE Online"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "httpx>=0.28.1",
     "textual>=8.2.8",
 ]
 

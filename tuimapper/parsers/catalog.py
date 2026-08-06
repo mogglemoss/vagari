@@ -53,11 +53,13 @@ class WormholeType:
 @dataclass(frozen=True)
 class SystemInfo:
     jcode: str                  # "J105443"
+    system_id: int              # EVE system id (for ESI enrichment)
     jclass: str                 # display: "C1".."C13", "Thera", "Sentinel", ...
     effect: str | None
     shattered: bool
     statics: tuple[str, ...]    # wormhole-type codes, e.g. ("Z060",)
     static_display: str         # e.g. "N" or "C3,H"
+    region: str | None
 
 
 def _data(name: str) -> object:
@@ -93,11 +95,13 @@ def load_systems() -> dict[str, SystemInfo]:
         ]
         systems[s["name"].upper()] = SystemInfo(
             jcode=s["name"],
+            system_id=s["systemId"],
             jclass=_display_class(s["classKey"]),
             effect=s["effect"],
             shattered=s["shattered"],
             statics=statics,
             static_display=",".join(targets),
+            region=s.get("region"),
         )
     return systems
 

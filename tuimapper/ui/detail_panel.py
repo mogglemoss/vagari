@@ -5,7 +5,8 @@ from __future__ import annotations
 from textual.widgets import Static
 
 from tuimapper.model.chain import System
-from tuimapper.parsers.catalog import lookup_wh_type
+from tuimapper.model.lifetime import LifeStatus, assess, hours_text
+from tuimapper.parsers.catalog import lookup_system, lookup_wh_type
 from tuimapper.session import Session
 from tuimapper.ui.chain_tree import DIM, MUTED, RUST, TEXT, WARN, age_text
 
@@ -44,6 +45,24 @@ class DetailPanel(Static):
             lines.append(f"[{TEXT}]{system.jclass}{statics}[/{TEXT}]")
         if system.effect:
             lines.append(f"[{WARN}]{system.effect}[/{WARN}]")
+        info = lookup_system(system.name)
+        if info is not None:
+            extras = []
+            if info.region:
+                extras.append(f"region {info.region}")
+            if info.shattered:
+                extras.append("SHATTERED")
+            if extras:
+                lines.append(f"[{MUTED}]{' · '.join(extras)}[/{MUTED}]")
+            activity = self.session.activity.get(info.system_id)
+            if activity is not None:
+                color = WARN if activity.hostile else MUTED
+                lines.append(
+                    f"[{color}]ACTIVITY (last hour): {activity.ship_kills} ship · "
+                    f"{activity.pod_kills} pod · {activity.npc_kills} NPC[/{color}]"
+                )
+            elif self.session.activity_fetched:
+                lines.append(f"[{MUTED}]ACTIVITY (last hour): none observed[/{MUTED}]")
         lines.append("")
         if system.sigs:
             lines.append(f"[{MUTED}]SIGNATURES ({len(system.sigs)})[/{MUTED}]")
@@ -86,12 +105,25 @@ class DetailPanel(Static):
                          f"[{TEXT}]{conn.child.name}[/{TEXT}]")
             wh_type = lookup_wh_type(conn.wh_type) if conn.wh_type else None
             if wh_type is not None:
-                opened_h = age_text(conn.opened_at)
                 lines.append(
                     f"[{MUTED}]{wh_type.code} → {wh_type.target_display} · "
                     f"{wh_type.size} · lifetime {wh_type.lifetime_hours:g}h · "
-                    f"open {opened_h}[/{MUTED}]"
+                    f"open {age_text(conn.opened_at)}[/{MUTED}]"
                 )
+                life = assess(conn)
+                if life.remaining_hours is not None:
+                    if life.status is LifeStatus.EXPIRED:
+                        lines.append(
+                            f"[bold {DIM}]PAST BOOK LIFETIME — verify and sweep[/bold {DIM}]"
+                        )
+                    else:
+                        color = WARN if life.status in (
+                            LifeStatus.WANING, LifeStatus.EOL
+                        ) else MUTED
+                        lines.append(
+                            f"[{color}]≤{hours_text(life.remaining_hours)} remaining "
+                            f"(upper bound from first mapping)[/{color}]"
+                        )
             else:
                 lines.append(f"[{MUTED}]open {age_text(conn.opened_at)}[/{MUTED}]")
             status = []

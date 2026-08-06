@@ -12,6 +12,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Input, Static, Tree
 
+from tuimapper.enrichers.activity import fetch_system_kills
 from tuimapper.model.store import Store
 from tuimapper.session import Session
 from tuimapper.ui.chain_tree import ChainTree
@@ -44,9 +45,10 @@ class MapperApp(App):
         Binding("q", "quit", "Quit", show=True),
     ]
 
-    def __init__(self, session: Session | None = None) -> None:
+    def __init__(self, session: Session | None = None, *, recon: bool = True) -> None:
         super().__init__()
         self.session = session or Session.open(Store())
+        self.recon_enabled = recon  # tests disable the network fetch
 
     def compose(self) -> ComposeResult:
         yield Static(id="app-header")
@@ -66,6 +68,26 @@ class MapperApp(App):
     def on_mount(self) -> None:
         self.refresh_all()
         self.query_one(ChainTree).focus()
+        if self.recon_enabled:
+            self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
+        # Ages and lifetime countdowns tick; cursor position is preserved.
+        self.set_interval(60, self._tick)
+
+    def _tick(self) -> None:
+        if not isinstance(self.focused, Input):
+            self.refresh_all()
+
+    async def _refresh_activity(self) -> None:
+        activity = await fetch_system_kills()
+        if activity is None:
+            self.session.activity_fetched = False
+            self.status("Reconnaissance unavailable. The Bureau does not speculate offline.")
+            return
+        self.session.activity = activity
+        self.session.activity_fetched = True
+        node = self.query_one(ChainTree).cursor_node
+        self.query_one(DetailPanel).show_node(node.data if node else None)
+        self.status(f"Reconnaissance filed: activity for {len(activity)} systems.")
 
     # -- refresh -------------------------------------------------------------
 
@@ -107,6 +129,10 @@ class MapperApp(App):
             return
         if text in ("?", "help"):
             self.action_show_help()
+            return
+        if text == "recon":
+            self.status("Reconnaissance dispatched…")
+            self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
             return
         if text.startswith(":"):
             text = text[1:].strip()
