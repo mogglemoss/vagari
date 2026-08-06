@@ -12,6 +12,15 @@ from vagari.session import Session
 from vagari.ui.chain_tree import DIM, MUTED, RUST, TEXT, WARN, age_text
 from vagari.ui.graphs import gauge, spark
 
+def human_mass(kg: float) -> str:
+    """3_000_000_000 → '3.0B kg' — the units wormholers actually say."""
+    if kg >= 1e9:
+        return f"{kg / 1e9:.1f}B kg"
+    if kg >= 1e6:
+        return f"{kg / 1e6:.1f}M kg"
+    return f"{kg:,.0f} kg"
+
+
 EMPTY_STATE = f"""\
 [{MUTED}]FORM ACB-01 (CHAIN CUSTODY)[/{MUTED}]
 
@@ -138,6 +147,15 @@ class DetailPanel(Static):
                     f"{wh_type.size} · lifetime {wh_type.lifetime_hours:g}h · "
                     f"open {age_text(conn.opened_at)}[/{MUTED}]"
                 )
+                mass_bits = []
+                if wh_type.total_mass:
+                    mass_bits.append(f"total {human_mass(wh_type.total_mass)}")
+                if wh_type.jump_mass:
+                    mass_bits.append(f"per jump ≤{human_mass(wh_type.jump_mass)}")
+                if wh_type.mass_regen:
+                    mass_bits.append(f"regen {human_mass(wh_type.mass_regen)}/day")
+                if mass_bits:
+                    lines.append(f"[{MUTED}]{' · '.join(mass_bits)}[/{MUTED}]")
                 life = assess(conn)
                 if life.remaining_hours is not None:
                     if life.status is LifeStatus.EXPIRED:

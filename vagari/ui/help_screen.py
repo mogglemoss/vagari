@@ -11,6 +11,17 @@ from textual.widgets import Static
 _HELP_TEXT = """\
 [bold #C15F3C]ANOIKIS CARTOGRAPHIC BUREAU[/bold #C15F3C]  [#7a756e]instrument reference[/#7a756e]
 
+[#3a3530]── how to drive it ──────────────────────[/#3a3530]
+  [#e8e6e3]Paste scan telemetry any time the map
+  has focus — no mode, no prompt.[/#e8e6e3]
+  [#e8e6e3]Bold single keys below act instantly.
+  Typing anything else starts a submission
+  ([bold]nav qlm[/bold], [bold]htx J105443[/bold], …). [bold]Enter[/bold] files
+  it; [bold]Esc[/bold] withdraws it.[/#e8e6e3]
+  [#e8e6e3]If a submission begins with an instant
+  key's letter ([bold]eol[/bold], [bold]del[/bold], a sig like EAB),
+  press [bold]:[/bold] first — [bold]:[/bold] always works.[/#e8e6e3]
+
 [#3a3530]── deposits ─────────────────────────────[/#3a3530]
   [italic]paste[/italic]      deposit scan telemetry (implicit add)
   [bold]lazy[/bold]       arm reconciliation for next deposit

@@ -147,6 +147,9 @@ class MapperApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Without this, focusing the bar selects its contents and the next
+        # keystroke replaces the fzf-seeded character.
+        self.query_one("#command-bar", Input).select_on_focus = False
         self.refresh_all()
         self.query_one(ChainTree).focus()
         if self.recon_enabled:
@@ -243,10 +246,30 @@ class MapperApp(App):
             text = text[1:].strip()
         self._after_engine(self.session.execute(text))
 
+    # Keys that act instantly when the map has focus; any other letter or
+    # digit starts a submission fzf-style. Submissions that begin with one
+    # of these letters need the explicit `:` first.
+    _INSTANT_KEYS = set("123acdegklmquxzZ?")
+
     def on_key(self, event: events.Key) -> None:
-        if isinstance(self.focused, Input) and event.key == "escape":
-            self.query_one(ChainTree).focus()
+        if isinstance(self.focused, Input):
+            if event.key == "escape":
+                self.query_one(ChainTree).focus()
+                event.stop()
+            return
+        ch = event.character
+        if (
+            ch
+            and ch.isalnum()
+            and len(event.key) == 1  # plain keypress, no ctrl/meta chords
+            and ch not in self._INSTANT_KEYS
+        ):
+            bar = self.query_one("#command-bar", Input)
+            bar.focus()
+            bar.value = ch
+            bar.cursor_position = len(bar.value)
             event.stop()
+            event.prevent_default()
 
     # -- tree selection ------------------------------------------------------
 

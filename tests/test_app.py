@@ -221,6 +221,60 @@ async def test_command_palette_curated(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_fzf_typing_starts_submission(tmp_path):
+    from textual.widgets import Input
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        # 'n' is not an instant key: it should focus the bar seeded with 'n'.
+        await pilot.press("n")
+        await pilot.pause()
+        assert isinstance(app.focused, Input)
+        await pilot.press(*"av qlm")
+        # No connection yet, so nav refuses — but the submission executed.
+        await pilot.press("enter")
+        await pilot.pause()
+        status = str(app.query_one("#status-line", Static).content)
+        assert "REFUSED" in status
+        assert not isinstance(app.focused, Input)  # focus returned to the map
+
+        # Instant keys still act instantly: 'z' undoes, no submission starts.
+        await pilot.press("z")
+        await pilot.pause()
+        assert not isinstance(app.focused, Input)
+
+        # Escape withdraws a started submission; pasting afterwards ingests.
+        await pilot.press("s")
+        await pilot.pause()
+        assert isinstance(app.focused, Input)
+        await pilot.press("escape")
+        await pilot.pause()
+        await paste(app, pilot, "paste_mixed.txt")
+        assert app.session.chain.current().sigs  # ingest reached the chain
+
+
+@pytest.mark.asyncio
+async def test_wormhole_type_mass_in_detail(tmp_path):
+    from vagari.ui.detail_panel import DetailPanel, human_mass
+
+    assert human_mass(3_000_000_000) == "3.0B kg"
+    assert human_mass(5_000_000) == "5.0M kg"
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        await pilot.press("colon")
+        await pilot.press(*"qlm N110")
+        await pilot.press("enter")
+        await pilot.pause()
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("sig", [], "QLM"))
+        text = str(panel.content)
+        assert "N110" in text and "per jump ≤" in text and "total" in text
+
+
+@pytest.mark.asyncio
 async def test_view_filter(tmp_path):
     app = make_app(tmp_path)
     async with app.run_test() as pilot:
