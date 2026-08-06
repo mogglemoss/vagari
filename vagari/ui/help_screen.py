@@ -31,6 +31,10 @@ _HELP_TEXT = """\
   [bold]eol abc[/bold] / [bold]e[/bold]  toggle end-of-life
   [bold]crit abc[/bold] / [bold]m[/bold] cycle mass state
 
+[#3a3530]── the legend ───────────────────────────[/#3a3530]
+  [#C15F3C]○[/#C15F3C] wormhole   [#7a756e]▸ combat  ◇ data  ◈ relic[/#7a756e]
+  [#7a756e]≈ gas  ▪ ore  · unresolved  ![/#7a756e] flagged
+
 [#3a3530]── views & custody ──────────────────────[/#3a3530]
   [bold]1[/bold]/[bold]2[/bold]/[bold]3[/bold]      full / paths / gas
   [bold]z[/bold] / [bold]Z[/bold]      undo / redo (unbounded)

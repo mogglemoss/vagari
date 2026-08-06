@@ -64,7 +64,7 @@ def build_session(tmp: Path) -> Session:
 async def shoot() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         session = build_session(Path(tmp))
-        app = MapperApp(session=session, recon=False)
+        app = MapperApp(session=session, recon=False, follow=False)
         async with app.run_test(size=(120, 36)) as pilot:
             await pilot.pause()
             app.save_screenshot(str(OUT / "shot_chain.svg"))

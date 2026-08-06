@@ -11,12 +11,16 @@ from vagari.model.chain import Connection, Signature, SigGroup, System, utcnow
 from vagari.model.lifetime import LifeStatus, assess, hours_text
 from vagari.session import Session
 
+# One glyph per site kind, all single-width geometrics. ○ is a hole you can
+# pass through — it pairs with the ◉ YOU marker. ◈/◇ pair relic (filled,
+# treasure) with data (hollow, signal). ≈ is vapor, ▪ is a chunk of rock,
+# · is a signature not yet resolved. ▸ matches HARUSPEX's combat glyph.
 _GLYPHS = {
-    SigGroup.WORMHOLE: "~",
+    SigGroup.WORMHOLE: "○",
     SigGroup.COMBAT: "▸",
-    SigGroup.DATA: "◆",
+    SigGroup.DATA: "◇",
     SigGroup.RELIC: "◈",
-    SigGroup.GAS: "<",
+    SigGroup.GAS: "≈",
     SigGroup.ORE: "▪",
     SigGroup.UNKNOWN: "·",
 }
