@@ -11,11 +11,11 @@ from pathlib import Path
 # hidden under ~/Documents, and Python 3.11+ skips hidden .pth files.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from tuimapper.model.chain import Chain
-from tuimapper.model.reconcile import apply_despawn, reconcile
-from tuimapper.model.store import Store
-from tuimapper.parsers.catalog import lookup_system, lookup_wh_type
-from tuimapper.parsers.scanner import parse_scan
+from vagari.model.chain import Chain
+from vagari.model.reconcile import apply_despawn, reconcile
+from vagari.model.store import Store
+from vagari.parsers.catalog import lookup_system, lookup_wh_type
+from vagari.parsers.scanner import parse_scan
 
 FIXTURES = Path(__file__).parent.parent / "tests" / "fixtures"
 

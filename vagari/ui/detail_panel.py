@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from textual.widgets import Static
 
-from tuimapper.model.chain import System
-from tuimapper.model.lifetime import LifeStatus, assess, hours_text
-from tuimapper.parsers.catalog import lookup_system, lookup_wh_type
-from tuimapper.session import Session
-from tuimapper.ui.chain_tree import DIM, MUTED, RUST, TEXT, WARN, age_text
+from vagari.model.chain import System
+from vagari.model.lifetime import LifeStatus, assess, hours_text
+from vagari.parsers.catalog import lookup_system, lookup_wh_type
+from vagari.session import Session
+from vagari.ui.chain_tree import DIM, MUTED, RUST, TEXT, WARN, age_text
 
 EMPTY_STATE = f"""\
 [{MUTED}]FORM ACB-01 (CHAIN CUSTODY)[/{MUTED}]

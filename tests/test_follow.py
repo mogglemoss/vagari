@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from tuimapper.followme.logtail import (
+from vagari.followme.logtail import (
     latest_local_log,
     parse_system_change,
     tail_system_changes,
 )
-from tuimapper.model.chain import SigGroup
-from tuimapper.model.store import Store
-from tuimapper.session import Session
+from vagari.model.chain import SigGroup
+from vagari.model.store import Store
+from vagari.session import Session
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

@@ -63,7 +63,7 @@ class SystemInfo:
 
 
 def _data(name: str) -> object:
-    text = (resources.files("tuimapper") / "data" / name).read_text(encoding="utf-8")
+    text = (resources.files("vagari") / "data" / name).read_text(encoding="utf-8")
     return json.loads(text)
 
 

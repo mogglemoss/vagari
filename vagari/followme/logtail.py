@@ -34,8 +34,8 @@ LOG_CANDIDATES: list[Path] = [
 
 
 def detect_chatlog_dir() -> Path | None:
-    """TUIMAPPER_LOG_DIR overrides; otherwise first existing candidate."""
-    override = os.environ.get("TUIMAPPER_LOG_DIR")
+    """VAGARI_LOG_DIR overrides; otherwise first existing candidate."""
+    override = os.environ.get("VAGARI_LOG_DIR")
     if override:
         p = Path(override).expanduser()
         return p if p.is_dir() else None

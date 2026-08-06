@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from tuimapper.model.chain import MassState, SigGroup
-from tuimapper.model.store import Store
-from tuimapper.session import Session
+from vagari.model.chain import MassState, SigGroup
+from vagari.model.store import Store
+from vagari.session import Session
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

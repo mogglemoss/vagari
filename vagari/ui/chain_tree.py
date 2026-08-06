@@ -7,9 +7,9 @@ from datetime import datetime
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 
-from tuimapper.model.chain import Connection, Signature, SigGroup, System, utcnow
-from tuimapper.model.lifetime import LifeStatus, assess, hours_text
-from tuimapper.session import Session
+from vagari.model.chain import Connection, Signature, SigGroup, System, utcnow
+from vagari.model.lifetime import LifeStatus, assess, hours_text
+from vagari.session import Session
 
 _GLYPHS = {
     SigGroup.WORMHOLE: "~",

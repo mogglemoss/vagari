@@ -1,4 +1,4 @@
-# tuimapper — Research Notes
+# vagari — Research Notes
 
 Research date: 2026-08-06. Sources: chloroken/bashmapper (read in full), the local
 HARUSPEX codebase (surveyed), and the local eve-online-spookyspace data pipeline.
@@ -16,7 +16,7 @@ HARUSPEX codebase (surveyed), and the local eve-online-spookyspace data pipeline
   hs/ls/ns and null (K162-style).
 - `effects.json` — weather bonus tables by class; `classes.json` — class metadata.
 
-Vendored into `tuimapper/data/` (M1). This resolves the wormhole-type DB need for M3
+Vendored into `vagari/data/` (M1). This resolves the wormhole-type DB need for M3
 lifetime/mass estimates.
 
 ## Naming family
@@ -24,7 +24,7 @@ lifetime/mass estimates.
 GitHub org `mogglemoss`: HARUSPEX (d-scan TUI), AUSPEX (Android char intel),
 RETROSPEX (pilot dossier, killboard-driven, private repo — richer killboard patterns
 than haruspex's zkill.py; consult for M3). Convention: Latin **-SPEX**, "one who
-observes". tuimapper's final name should follow it.
+observes". vagari's final name should follow it.
 
 ## Dev-env gotcha (verified 2026-08-06)
 
@@ -105,7 +105,7 @@ Directly liftable, in value order:
 Voice: deadpan corporate intelligence bureaucracy, third person, ALL-CAPS legal
 boilerplate in empty states, clinical euphemisms ("Deposit scan telemetry"), org-unit
 naming per panel (INTELLIGENCE / PERSONNEL / MONITORING DIVISION), British spelling,
-box-drawing mascot with animated accent. tuimapper = **CARTOGRAPHY DIVISION**.
+box-drawing mascot with animated accent. vagari = **CARTOGRAPHY DIVISION**.
 
 ## Probe scanner clipboard format (target of the new parser)
 

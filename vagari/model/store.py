@@ -17,12 +17,12 @@ import re
 import sys
 from pathlib import Path
 
-from tuimapper.model.chain import Chain
+from vagari.model.chain import Chain
 
 _SNAP = re.compile(r"^snap-(\d{6})\.json$")
 
 
-def default_base_dir(app_name: str = "tuimapper") -> Path:
+def default_base_dir(app_name: str = "vagari") -> Path:
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / app_name / "state"
     if sys.platform == "win32":

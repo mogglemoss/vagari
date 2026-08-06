@@ -1,5 +1,5 @@
-from tuimapper.model.chain import Chain, Signature
-from tuimapper.model.store import Store
+from vagari.model.chain import Chain, Signature
+from vagari.model.store import Store
 
 
 def make_store(tmp_path, keep=100) -> Store:

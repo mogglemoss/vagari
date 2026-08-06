@@ -12,9 +12,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from textual import events
 
-from tuimapper.main import MapperApp
-from tuimapper.model.store import Store
-from tuimapper.session import Session
+from vagari.main import MapperApp
+from vagari.model.store import Store
+from vagari.session import Session
 
 FIXTURES = Path(__file__).parent.parent / "tests" / "fixtures"
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
@@ -45,8 +45,8 @@ def build_session(tmp: Path) -> Session:
     # and file some reconnaissance so the detail panel has activity data.
     from datetime import timedelta
 
-    from tuimapper.enrichers.activity import SystemActivity
-    from tuimapper.parsers.catalog import lookup_system
+    from vagari.enrichers.activity import SystemActivity
+    from vagari.parsers.catalog import lookup_system
 
     session.chain.top()
     session.execute("nav qlm")

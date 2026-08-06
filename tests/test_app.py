@@ -6,11 +6,11 @@ import pytest
 from textual import events
 from textual.widgets import Static
 
-from tuimapper.main import MapperApp
-from tuimapper.model.store import Store
-from tuimapper.session import Session
-from tuimapper.ui.chain_tree import ChainTree
-from tuimapper.ui.help_screen import HelpScreen
+from vagari.main import MapperApp
+from vagari.model.store import Store
+from vagari.session import Session
+from vagari.ui.chain_tree import ChainTree
+from vagari.ui.help_screen import HelpScreen
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -97,9 +97,9 @@ async def test_help_screen(tmp_path):
 
 @pytest.mark.asyncio
 async def test_detail_panel_shows_activity(tmp_path):
-    from tuimapper.enrichers.activity import SystemActivity
-    from tuimapper.parsers.catalog import lookup_system
-    from tuimapper.ui.detail_panel import DetailPanel
+    from vagari.enrichers.activity import SystemActivity
+    from vagari.parsers.catalog import lookup_system
+    from vagari.ui.detail_panel import DetailPanel
 
     app = make_app(tmp_path)
     sid = lookup_system("J105443").system_id
@@ -118,11 +118,11 @@ async def test_follow_me_end_to_end(tmp_path, monkeypatch):
     """Real tailer + real app: a chatlog jump moves ◉ YOU and files a K162."""
     chatlogs = tmp_path / "Chatlogs"
     chatlogs.mkdir()
-    monkeypatch.setenv("TUIMAPPER_LOG_DIR", str(chatlogs))
-    from tuimapper.followme.logtail import tail_system_changes as real_tail
+    monkeypatch.setenv("VAGARI_LOG_DIR", str(chatlogs))
+    from vagari.followme.logtail import tail_system_changes as real_tail
 
     monkeypatch.setattr(
-        "tuimapper.main.tail_system_changes",
+        "vagari.main.tail_system_changes",
         lambda d, cb: real_tail(d, cb, poll_interval=0.02),
     )
 

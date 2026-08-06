@@ -1,6 +1,6 @@
 import pytest
 
-from tuimapper.model.chain import Chain, ChainError, Signature, SigGroup
+from vagari.model.chain import Chain, ChainError, Signature, SigGroup
 
 
 def make_chain() -> Chain:

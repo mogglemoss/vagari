@@ -1,0 +1,82 @@
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  # ── Linux ────────────────────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev
+      - run: uv run pytest
+      - run: uv run pyinstaller vagari.spec
+      - run: ./dist/vagari/vagari --version
+      - run: tar -czf dist/vagari-linux.tar.gz -C dist vagari
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vagari-linux
+          path: dist/vagari-linux.tar.gz
+
+  # ── Windows ──────────────────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev
+      - run: uv run pytest
+      - run: uv run pyinstaller vagari.spec
+      - run: ./dist/vagari/vagari.exe --version
+      - run: Compress-Archive -Path dist/vagari -DestinationPath dist/vagari-windows.zip
+        shell: pwsh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vagari-windows
+          path: dist/vagari-windows.zip
+
+  # ── macOS universal binary (Intel + Apple Silicon) ───────────────────────
+  build-macos:
+    runs-on: macos-latest
+    env:
+      VAGARI_UNIVERSAL2: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev
+      - run: uv run pytest
+      - run: uv run pyinstaller vagari.spec
+      - run: ./dist/vagari/vagari --version
+      - run: tar -czf dist/vagari-macos.tar.gz -C dist vagari
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vagari-macos
+          path: dist/vagari-macos.tar.gz
+
+  # ── Release — only on version tags ──────────────────────────────────────
+  release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: vagari-{linux,windows,macos}
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v2.6.1
+        with:
+          files: dist/*
+          generate_release_notes: true

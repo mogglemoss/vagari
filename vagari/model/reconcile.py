@@ -14,8 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from tuimapper.model.chain import ChainError, Signature, SigGroup, System, utcnow
-from tuimapper.parsers.scanner import ScanLine
+from vagari.model.chain import ChainError, Signature, SigGroup, System, utcnow
+from vagari.parsers.scanner import ScanLine
 
 
 @dataclass

@@ -1,4 +1,4 @@
-from tuimapper.enrichers.activity import SystemActivity, parse_system_kills
+from vagari.enrichers.activity import SystemActivity, parse_system_kills
 
 
 def test_parse_payload():

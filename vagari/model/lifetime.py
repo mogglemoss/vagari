@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 
-from tuimapper.model.chain import Connection, utcnow
-from tuimapper.parsers.catalog import lookup_wh_type
+from vagari.model.chain import Connection, utcnow
+from vagari.parsers.catalog import lookup_wh_type
 
 
 class LifeStatus(str, Enum):

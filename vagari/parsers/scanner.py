@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from tuimapper.model.chain import SigGroup
+from vagari.model.chain import SigGroup
 
 _SIG_ID = re.compile(r"^[A-Z]{3}-\d{3}$", re.IGNORECASE)
 

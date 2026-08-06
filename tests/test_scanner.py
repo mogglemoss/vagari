@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from tuimapper.model.chain import SigGroup
-from tuimapper.parsers.scanner import parse_scan
+from vagari.model.chain import SigGroup
+from vagari.parsers.scanner import parse_scan
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

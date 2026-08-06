@@ -1,4 +1,4 @@
-"""tuimapper — wormhole chain custody instrument (working title).
+"""vagari — wormhole chain custody instrument (working title).
 
 ANOIKIS CARTOGRAPHIC BUREAU · Department of Spatial Relations
 Ministry of Pantoscopic Observance
@@ -12,19 +12,19 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Input, Static, Tree
 
-from tuimapper.enrichers.activity import fetch_system_kills
-from tuimapper.followme.logtail import detect_chatlog_dir, tail_system_changes
-from tuimapper.model.store import Store
-from tuimapper.session import Session
-from tuimapper.ui.chain_tree import ChainTree
-from tuimapper.ui.detail_panel import DetailPanel
-from tuimapper.ui.help_screen import HelpScreen
+from vagari.enrichers.activity import fetch_system_kills
+from vagari.followme.logtail import detect_chatlog_dir, tail_system_changes
+from vagari.model.store import Store
+from vagari.session import Session
+from vagari.ui.chain_tree import ChainTree
+from vagari.ui.detail_panel import DetailPanel
+from vagari.ui.help_screen import HelpScreen
 
 BRAND = "ANOIKIS CARTOGRAPHIC BUREAU"
 
 
 class MapperApp(App):
-    TITLE = "TUIMAPPER"
+    TITLE = "VAGARI"
     SUB_TITLE = f"{BRAND} · Chain Custody Instrument · Capsuleer Edition"
     CSS_PATH = "ui/theme.tcss"
 
@@ -84,7 +84,7 @@ class MapperApp(App):
             if chatlog_dir is None:
                 self.status(
                     "Chatlogs not found — follow-me disabled. "
-                    "Set TUIMAPPER_LOG_DIR to your EVE Chatlogs directory."
+                    "Set VAGARI_LOG_DIR to your EVE Chatlogs directory."
                 )
             else:
                 self.run_worker(
@@ -240,6 +240,18 @@ class MapperApp(App):
 
 
 def main() -> None:
+    import sys
+
+    if "--version" in sys.argv:
+        # Also exercises the bundled data — a packaging self-test.
+        from vagari import __version__
+        from vagari.parsers.catalog import load_systems, load_wormhole_types
+
+        print(
+            f"VAGARI {__version__} · Anoikis Cartographic Bureau · "
+            f"{len(load_systems())} systems · {len(load_wormhole_types())} wormhole types"
+        )
+        return
     MapperApp().run()
 
 

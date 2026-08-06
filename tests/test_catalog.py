@@ -1,4 +1,4 @@
-from tuimapper.parsers.catalog import lookup_system, lookup_wh_type, load_systems
+from vagari.parsers.catalog import lookup_system, lookup_wh_type, load_systems
 
 
 def test_catalog_loads_all_jspace():

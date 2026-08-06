@@ -1,7 +1,9 @@
-# tuimapper — Plan
+# VAGARI — Plan
 
-Working name `tuimapper`; final brand TBD (family convention: -SPEX, per HARUSPEX /
-AUSPEX / RETROSPEX). In-fiction: **HARUSPEX CARTOGRAPHY DIVISION**.
+Named **VAGARI** (Latin *vagari*, "to wander") on 2026-08-06 — a deliberate departure
+from the -SPEX family, keeping the Ministry's Latin register with a nomadic cast.
+In-fiction: an instrument of the **Anoikis Cartographic Bureau, Department of Spatial
+Relations, Ministry of Pantoscopic Observance**.
 
 > Status 2026-08-06: **M1 complete** — engine (model/store/reconcile/parsers) built and
 > tested, 34 tests green, round-trip demo (`scripts/demo_roundtrip.py`) passing.
@@ -28,11 +30,11 @@ AUSPEX / RETROSPEX). In-fiction: **HARUSPEX CARTOGRAPHY DIVISION**.
 ## Architecture
 
 ```
-tuimapper/
-  pyproject.toml            # uv + hatchling, console script tuimapper=tuimapper.main:main
-  tuimapper.spec            # PyInstaller --onedir, universal2 (copy haruspex.spec)
+vagari/
+  pyproject.toml            # uv + hatchling, console script vagari=vagari.main:main
+  vagari.spec            # PyInstaller --onedir, universal2 (copy haruspex.spec)
   .github/workflows/build.yml
-  tuimapper/
+  vagari/
     main.py                 # App shell, keybindings, theme import
     theme.tcss              # HARUSPEX palette, extracted (not inline CSS)
     model/
@@ -106,7 +108,7 @@ structurally cannot do.
 
 ### Persistence + undo
 
-JSON snapshot per mutation into `~/.local/state/tuimapper/<chain>/` (platformdirs
+JSON snapshot per mutation into `~/.local/state/vagari/<chain>/` (platformdirs
 equivalent paths on macOS/Windows), ring-buffered to ~100 snapshots. Undo/redo = pointer
 into the ring. Autoload last chain on start. This replaces bashmapper's three `cp -r`
 backups with unbounded-enough history for free.
@@ -172,12 +174,17 @@ aware, replays only the LAST system change from history so stale jumps don't mar
 marker); on system change: move into a mapped child, back to the parent, or anywhere in
 the chain (BFS); unmapped arrivals become a pending K162 filed with `k`/`k162` (Z-series
 placeholder sig, catalog-enriched destination). Fresh chains auto-name their root from
-the first arrival; `here <name>` names any system manually. TUIMAPPER_LOG_DIR overrides
+the first arrival; `here <name>` names any system manually. VAGARI_LOG_DIR overrides
 detection (macOS/Windows Documents, Steam Proton, Flatpak). 79 tests incl. an
 end-to-end pilot test with a real tmp chatlog. Exit: v0.3 (tagged locally).
 
-**M5 — release.** PyInstaller spec, CI matrix, README in-voice, attribution for
-chloroken's catalog. Exit: tagged release with three platform artifacts.
+**M5 — release.** ✅ DONE (2026-08-06). `vagari.spec` (--onedir; universal2 only under
+VAGARI_UNIVERSAL2=1 in CI since local Pythons are single-arch; thin launcher entry so
+Textual's CSS_PATH resolves inside the frozen package — direct-script entry broke it;
+theme.tcss bundled at both paths as insurance), `--version` flag doubling as a bundled-
+data self-test, three-platform GitHub Actions matrix (pytest + build + frozen-binary
+smoke per platform, release on v* tags). Verified locally: frozen binary draws the full
+TUI in a pty and quits clean. Tag v0.4.0 (local; CI runs on first push to a remote).
 
 ## Risks / open items
 
@@ -193,4 +200,4 @@ chloroken's catalog. Exit: tagged release with three platform artifacts.
   themselves; keep doing that for new entry points.
 - **Textual Tree ergonomics** at 30+ system chains — validate early in M2; fall back to a
   custom renderable if `Tree` fights the glyph-dense labels.
-- Final name/brand: TBD before M5 (repo, binary, config dir all currently `tuimapper`).
+- Final name/brand: TBD before M5 (repo, binary, config dir all currently `vagari`).

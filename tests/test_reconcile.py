@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tuimapper.model.chain import Signature, SigGroup, System
-from tuimapper.model.reconcile import apply_despawn, reconcile
-from tuimapper.parsers.scanner import parse_scan
+from vagari.model.chain import Signature, SigGroup, System
+from vagari.model.reconcile import apply_despawn, reconcile
+from vagari.parsers.scanner import parse_scan
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -80,7 +80,7 @@ def test_lazy_blocks_connections_with_children():
     reconcile(system, paste("paste_mixed.txt"), now=T1)
 
     # Open FIY into a child that has mapped content.
-    from tuimapper.model.chain import Connection
+    from vagari.model.chain import Connection
 
     child = System(name="J154535", sigs=[Signature(sig_id="AAA-111")])
     system.connections.append(Connection(sig_prefix="FIY", child=child))

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from tuimapper.model.chain import Connection, System
-from tuimapper.model.lifetime import LifeStatus, assess, hours_text
+from vagari.model.chain import Connection, System
+from vagari.model.lifetime import LifeStatus, assess, hours_text
 
 T0 = datetime(2026, 8, 6, 12, 0, tzinfo=timezone.utc)
 

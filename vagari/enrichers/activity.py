@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import httpx
 
 ESI_SYSTEM_KILLS = "https://esi.evetech.net/latest/universe/system_kills/"
-USER_AGENT = "tuimapper (Anoikis Cartographic Bureau; scott.corbin@gmail.com)"
+USER_AGENT = "vagari (Anoikis Cartographic Bureau; scott.corbin@gmail.com)"
 
 
 @dataclass(frozen=True)

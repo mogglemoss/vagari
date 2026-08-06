@@ -1,6 +1,6 @@
 [project]
-name = "tuimapper"
-version = "0.1.0.dev0"
+name = "vagari"
+version = "0.4.0"
 description = "Anoikis Cartographic Bureau — a terminal wormhole chain mapper for EVE Online"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,10 +10,11 @@ dependencies = [
 ]
 
 [project.scripts]
-tuimapper = "tuimapper.main:main"
+vagari = "vagari.main:main"
 
 [dependency-groups]
 dev = [
+    "pyinstaller>=6.21.0",
     "pytest>=9.0",
     "pytest-asyncio>=1.4.0",
 ]

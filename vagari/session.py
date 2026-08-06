@@ -9,11 +9,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from tuimapper.model.chain import Chain, ChainError, MassState, Signature, SigGroup
-from tuimapper.model.reconcile import ReconcileReport, apply_despawn, reconcile
-from tuimapper.model.store import Store
-from tuimapper.parsers.catalog import lookup_system, lookup_wh_type
-from tuimapper.parsers.scanner import parse_scan
+from vagari.model.chain import Chain, ChainError, MassState, Signature, SigGroup
+from vagari.model.reconcile import ReconcileReport, apply_despawn, reconcile
+from vagari.model.store import Store
+from vagari.parsers.catalog import lookup_system, lookup_wh_type
+from vagari.parsers.scanner import parse_scan
 
 _JCODE = re.compile(r"^[Jj]?\d{6}$")
 _PREFIX = re.compile(r"^[A-Za-z]{3}(-\d{3})?$")
