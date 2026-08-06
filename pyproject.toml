@@ -1,0 +1,22 @@
+[project]
+name = "tuimapper"
+version = "0.1.0.dev0"
+description = "HARUSPEX CARTOGRAPHY DIVISION — a terminal wormhole chain mapper for EVE Online"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

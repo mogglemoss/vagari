@@ -1,0 +1,6 @@
+ASD-123	Cosmic Signature			0.0%	21.66 AU
+VMX-171	Cosmic Signature	Gas Site		87.5%	11.09 AU
+FIY-570	Cosmic Signature	Relic Site	Ruined Guristas Crystal Quarry	100.0%	9.06 AU
+QLM-802	Cosmic Signature	Wormhole	Unstable Wormhole	100.0%	3.72 AU
+XAL-201	Cosmic Anomaly	Combat Site	Guristas Hidden Rally Point	100.0%	2.1 AU
+not a scan line at all

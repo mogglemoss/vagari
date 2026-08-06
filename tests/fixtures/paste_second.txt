@@ -1,0 +1,3 @@
+ASD-123	Cosmic Signature	Data Site	Unsecured Frontier Receiver	100.0%	21.66 AU
+QLM-802	Cosmic Signature	Wormhole	Unstable Wormhole	100.0%	3.72 AU
+ZZT-909	Cosmic Signature			12.4%	30.11 AU
