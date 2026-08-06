@@ -20,11 +20,16 @@ uv run python -m tuimapper
 [RESEARCH.md](RESEARCH.md).) Copy your probe scanner results (Ctrl+A, Ctrl+C)
 and paste into the app. `?` inside the instrument shows the full reference.
 
+The instrument follows you: jump a hole in-game and the ◉ YOU marker moves
+with you via your EVE chatlogs (auto-detected; override with
+`TUIMAPPER_LOG_DIR`). Arrive somewhere unmapped and press `k` to file it as
+a K162. Wormholes carry lifetime countdowns; `recon` files last-hour system
+activity from public ESI.
+
 ## Status
 
-M2 (TUI, feature parity with bashmapper and then some) complete — see
-[PLAN.md](PLAN.md) for the milestone map: enrichment timers, then
-chatlog-following, then packaged releases.
+M4 complete (engine, TUI, enrichment/timers, chatlog follow-me) — see
+[PLAN.md](PLAN.md). Remaining: M5, packaged releases.
 
 ## Development
 

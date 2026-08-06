@@ -13,6 +13,7 @@ from textual.containers import Horizontal
 from textual.widgets import Footer, Input, Static, Tree
 
 from tuimapper.enrichers.activity import fetch_system_kills
+from tuimapper.followme.logtail import detect_chatlog_dir, tail_system_changes
 from tuimapper.model.store import Store
 from tuimapper.session import Session
 from tuimapper.ui.chain_tree import ChainTree
@@ -42,13 +43,21 @@ class MapperApp(App):
         Binding("x", "sig_cmd('flag')", "Flag", show=False),
         Binding("d", "sig_cmd('del')", "Strike", show=False),
         Binding("l", "arm_lazy", "Lazy", show=True),
+        Binding("k", "file_k162", "File K162", show=False),
         Binding("q", "quit", "Quit", show=True),
     ]
 
-    def __init__(self, session: Session | None = None, *, recon: bool = True) -> None:
+    def __init__(
+        self,
+        session: Session | None = None,
+        *,
+        recon: bool = True,
+        follow: bool = True,
+    ) -> None:
         super().__init__()
         self.session = session or Session.open(Store())
-        self.recon_enabled = recon  # tests disable the network fetch
+        self.recon_enabled = recon    # tests disable the network fetch
+        self.follow_enabled = follow  # tests disable the chatlog tailer
 
     def compose(self) -> ComposeResult:
         yield Static(id="app-header")
@@ -70,8 +79,26 @@ class MapperApp(App):
         self.query_one(ChainTree).focus()
         if self.recon_enabled:
             self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
+        if self.follow_enabled:
+            chatlog_dir = detect_chatlog_dir()
+            if chatlog_dir is None:
+                self.status(
+                    "Chatlogs not found — follow-me disabled. "
+                    "Set TUIMAPPER_LOG_DIR to your EVE Chatlogs directory."
+                )
+            else:
+                self.run_worker(
+                    tail_system_changes(chatlog_dir, self._on_system_change),
+                    exclusive=True,
+                    group="follow",
+                )
         # Ages and lifetime countdowns tick; cursor position is preserved.
         self.set_interval(60, self._tick)
+
+    async def _on_system_change(self, name: str) -> None:
+        message = self.session.follow(name)
+        if message is not None:
+            self._after_engine(message)
 
     def _tick(self) -> None:
         if not isinstance(self.focused, Input):
@@ -190,6 +217,9 @@ class MapperApp(App):
 
     def action_set_view(self, view: str) -> None:
         self._after_engine(self.session.execute(view))
+
+    def action_file_k162(self) -> None:
+        self._after_engine(self.session.file_k162())
 
     def action_arm_lazy(self) -> None:
         self._after_engine(self.session.execute("lazy"))

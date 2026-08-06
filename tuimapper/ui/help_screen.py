@@ -26,6 +26,7 @@ _HELP_TEXT = """\
   [bold]abc J105443[/bold]   open ABC to a catalogued system
   [bold]abc H296[/bold]      type wormhole ABC (class, life)
   [bold]abc <words>[/bold]   label a signature
+  [bold]here <name>[/bold]   name the current system
   [bold]flag abc[/bold] / [bold]x[/bold] flag · [bold]del abc[/bold] / [bold]d[/bold] strike
   [bold]eol abc[/bold] / [bold]e[/bold]  toggle end-of-life
   [bold]crit abc[/bold] / [bold]m[/bold] cycle mass state
@@ -35,6 +36,10 @@ _HELP_TEXT = """\
   [bold]z[/bold] / [bold]Z[/bold]      undo / redo (unbounded)
   [bold]chain <name>[/bold] switch chain of custody
   [bold]recon[/bold]      refresh system activity (ESI)
+
+[#3a3530]── follow-me ────────────────────────────[/#3a3530]
+  [#7a756e]jump in-game and ◉ YOU follows via chatlog[/#7a756e]
+  [bold]k[/bold] / [bold]k162[/bold]   file an unmapped arrival as K162
   [bold]:[/bold]        focus the submission line
   [bold]?[/bold]        show / close this reference
   [bold]q[/bold]        quit

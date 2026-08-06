@@ -167,9 +167,14 @@ live ESI path verified. Deferred to M4+: per-pilot/inhabitant enrichment via zKi
 lift patterns from haruspex `enrichers/` and mogglemoss/retrospex when we get there.
 Exit: v0.2 (tagged locally).
 
-**M4 — the map follows you.** Port the chatlog tailer; on system-change event, move
-`◉ YOU` along the chain if the destination is mapped; if unmapped, offer one-key "create
-K162 child here". Exit: jump a hole in-game, watch the marker move. v0.3.
+**M4 — the map follows you.** ✅ DONE (2026-08-06). Chatlog tailer (UTF-16LE, rotation-
+aware, replays only the LAST system change from history so stale jumps don't march the
+marker); on system change: move into a mapped child, back to the parent, or anywhere in
+the chain (BFS); unmapped arrivals become a pending K162 filed with `k`/`k162` (Z-series
+placeholder sig, catalog-enriched destination). Fresh chains auto-name their root from
+the first arrival; `here <name>` names any system manually. TUIMAPPER_LOG_DIR overrides
+detection (macOS/Windows Documents, Steam Proton, Flatpak). 79 tests incl. an
+end-to-end pilot test with a real tmp chatlog. Exit: v0.3 (tagged locally).
 
 **M5 — release.** PyInstaller spec, CI matrix, README in-voice, attribution for
 chloroken's catalog. Exit: tagged release with three platform artifacts.

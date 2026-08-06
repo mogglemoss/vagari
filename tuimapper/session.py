@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from tuimapper.model.chain import Chain, ChainError, MassState
+from tuimapper.model.chain import Chain, ChainError, MassState, Signature, SigGroup
 from tuimapper.model.reconcile import ReconcileReport, apply_despawn, reconcile
 from tuimapper.model.store import Store
 from tuimapper.parsers.catalog import lookup_system, lookup_wh_type
@@ -32,6 +32,8 @@ class Session:
     # ESI system-kill enrichment: system_id → SystemActivity; None until fetched.
     activity: dict = field(default_factory=dict, init=False)
     activity_fetched: bool = field(default=False, init=False)
+    # Follow-me: an arrival the chain can't place — (system name, path we came from).
+    pending_arrival: tuple[str, list[str]] | None = field(default=None, init=False)
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -128,6 +130,11 @@ class Session:
             return self._mass(rest[0])
         if head == "chain" and rest:
             return self._switch_chain(rest[0])
+        if head == "here" and rest:
+            return self._name_system(self.chain.current(), rest[0].upper()
+                                     if _JCODE.match(rest[0]) else " ".join(rest))
+        if head == "k162":
+            return self.file_k162()
         if _PREFIX.match(head) and rest:
             return self._sig_command(head, rest)
         return f"Unrecognised submission: {raw!r}. See `?` for accepted forms."
@@ -216,6 +223,109 @@ class Session:
         self._commit()
         life = f", {wh_type.lifetime_hours:g}h" if wh_type.lifetime_hours else ""
         return f"{conn.sig_prefix} typed {code} (→{wh_type.target_display}{life})."
+
+    # -- follow-me (chatlog) -------------------------------------------------
+
+    def follow(self, name: str) -> str | None:
+        """The pilot entered `name` in-game; move ◉ YOU. None = no change."""
+        chain = self.chain
+        current = chain.current()
+        if current.name == name:
+            return None
+
+        # Fresh chain: first observed system names the root.
+        if chain.root.name == "HOME" and not chain.root.connections:
+            return self._name_system(chain.root, name)
+
+        for conn in current.connections:
+            if conn.child.name == name:
+                chain.location.append(conn.sig_prefix)
+                self._commit()
+                return f"Followed you through {conn.sig_prefix} to {name}."
+
+        if chain.location:
+            parent = chain.system_at(chain.location[:-1])
+            if parent.name == name:
+                chain.location.pop()
+                self._commit()
+                return f"Followed you back up to {name}."
+
+        found = self._find_system(name)
+        if found is not None:
+            chain.location = found
+            self._commit()
+            return f"Relocated ◉ YOU to {name} (elsewhere in the chain)."
+
+        self.pending_arrival = (name, list(chain.location))
+        return (
+            f"Arrived in UNMAPPED {name}. Press k (or submit `k162`) to file it "
+            f"as a K162 out of {current.name}."
+        )
+
+    def file_k162(self) -> str:
+        """File a pending unmapped arrival as a K162 child of where we came from."""
+        if self.pending_arrival is None:
+            return "No unmapped arrival pending. The record is at peace."
+        name, from_path = self.pending_arrival
+        origin = self.chain.system_at(from_path)
+        prefix = self._placeholder_prefix(origin)
+        origin.sigs.append(
+            Signature(sig_id=f"{prefix}-000", group=SigGroup.WORMHOLE,
+                      label="K162 (unscanned)")
+        )
+        info = lookup_system(name)
+        saved_location = self.chain.location
+        self.chain.location = list(from_path)
+        try:
+            self.chain.open_connection(
+                prefix, info.jcode if info else name,
+                jclass=info.jclass if info else None,
+                statics=info.static_display if info else None,
+                effect=info.effect if info else None,
+                wh_type="K162",
+            )
+        except ChainError:
+            self.chain.location = saved_location
+            raise
+        self.chain.location = list(from_path) + [prefix]
+        self.pending_arrival = None
+        self._commit()
+        return (
+            f"Filed {name} as K162 via placeholder {prefix} — relabel it when "
+            "you scan the real signature."
+        )
+
+    def _find_system(self, name: str) -> list[str] | None:
+        """Breadth-first search for a system by name; returns its path."""
+        queue: list[tuple[list[str], object]] = [([], self.chain.root)]
+        while queue:
+            path, system = queue.pop(0)
+            if system.name == name:
+                return path
+            for conn in system.connections:
+                queue.append((path + [conn.sig_prefix], conn.child))
+        return None
+
+    @staticmethod
+    def _placeholder_prefix(system) -> str:
+        from itertools import product
+        from string import ascii_uppercase
+
+        for combo in product("Z", ascii_uppercase, ascii_uppercase):
+            prefix = "".join(combo)
+            if system.find_sig(prefix) is None:
+                return prefix
+        raise ChainError("no placeholder prefixes left; the Bureau is impressed")
+
+    def _name_system(self, system, name: str) -> str:
+        system.name = name
+        info = lookup_system(name)
+        if info is not None:
+            system.jclass = info.jclass
+            system.statics = info.static_display
+            system.effect = info.effect
+        self._commit()
+        return f"This system is now on record as {name}."
 
     def jump(self, path: list[str]) -> str:
         """Set the current location to an already-mapped path (tree navigation)."""

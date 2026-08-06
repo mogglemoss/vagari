@@ -15,10 +15,12 @@ from tuimapper.ui.help_screen import HelpScreen
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def make_app(tmp_path) -> MapperApp:
+def make_app(tmp_path, **kwargs) -> MapperApp:
     session = Session.open(Store(base_dir=tmp_path / "state"))
     session.chain.root.name = "J105443"
-    return MapperApp(session=session, recon=False)
+    kwargs.setdefault("recon", False)
+    kwargs.setdefault("follow", False)
+    return MapperApp(session=session, **kwargs)
 
 
 def tree_text(tree: ChainTree) -> str:
@@ -109,6 +111,62 @@ async def test_detail_panel_shows_activity(tmp_path):
         panel.show_node(("system", []))
         text = str(panel.content)
         assert "ACTIVITY" in text and "3 ship" in text
+
+
+@pytest.mark.asyncio
+async def test_follow_me_end_to_end(tmp_path, monkeypatch):
+    """Real tailer + real app: a chatlog jump moves ◉ YOU and files a K162."""
+    chatlogs = tmp_path / "Chatlogs"
+    chatlogs.mkdir()
+    monkeypatch.setenv("TUIMAPPER_LOG_DIR", str(chatlogs))
+    from tuimapper.followme.logtail import tail_system_changes as real_tail
+
+    monkeypatch.setattr(
+        "tuimapper.main.tail_system_changes",
+        lambda d, cb: real_tail(d, cb, poll_interval=0.02),
+    )
+
+    log = chatlogs / "Local_20260806_100000.txt"
+    log.write_text(
+        "[ 2026.08.06 12:00:00 ] EVE System > Channel changed to Local : J105443\n",
+        encoding="utf-16-le",
+    )
+
+    app = make_app(tmp_path, follow=True)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        await pilot.press("colon")
+        await pilot.press(*"qlm J154535")
+        await pilot.press("enter")
+        await pilot.pause()
+
+        # Jump through QLM in-game.
+        with open(log, "a", encoding="utf-16-le") as f:
+            f.write(
+                "[ 2026.08.06 12:05:00 ] EVE System > Channel changed to Local : J154535\n"
+            )
+        for _ in range(20):
+            await pilot.pause(0.05)
+            if app.session.chain.location == ["QLM"]:
+                break
+        assert app.session.chain.location == ["QLM"]
+        assert "◉ YOU" in tree_text(app.query_one(ChainTree))
+
+        # Jump somewhere unmapped, then file it with `k`.
+        with open(log, "a", encoding="utf-16-le") as f:
+            f.write(
+                "[ 2026.08.06 12:10:00 ] EVE System > Channel changed to Local : J100744\n"
+            )
+        for _ in range(20):
+            await pilot.pause(0.05)
+            if app.session.pending_arrival is not None:
+                break
+        assert app.session.pending_arrival == ("J100744", ["QLM"])
+
+        await pilot.press("k")
+        await pilot.pause()
+        assert app.session.chain.location == ["QLM", "ZAA"]
+        assert "J100744" in tree_text(app.query_one(ChainTree))
 
 
 @pytest.mark.asyncio
