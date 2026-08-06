@@ -18,14 +18,6 @@ Footer {
     color: $warm-muted;
 }
 
-#app-header {
-    dock: top;
-    height: 1;
-    background: $warm-surface;
-    color: $warm-muted;
-    padding: 0 1;
-}
-
 #body {
     height: 1fr;
 }

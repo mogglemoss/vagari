@@ -45,6 +45,8 @@ THE BUREAU IS MERELY NOTING.
 
 **Reconnaissance, on request.** `recon` files one unauthenticated request to ESI's public kill feed and annotates every system in your chain with last-hour ship, pod, and NPC kills. Offline it declines to guess. THE BUREAU DOES NOT SPECULATE OFFLINE.
 
+**Sites come pre-assessed.** Select any scanned signature and the Bureau files its verdict per the ARCHAEOLOGY and INHALATION circulars: relic and data tiers with their difficulty grades, sleeper sites with their class bands and a warning about the escort, gas reservoirs with their exact fullerite contents down to the unit, and the hazardous paperwork — **TIMED** ghost sites, **CACHE** sleeper caches, **TRAPPED** and **ALARMED** facilities — marked accordingly. The Bureau knows what a Vital Core Reservoir holds. It declines to tell you what it is worth; appraisal is a market activity.
+
 **Everything is undoable.** Every mutation is a snapshot; `z` and `Z` walk the record backward and forward without limit of consequence. Multiple chains of custody are maintained with `chain <name>`. The Bureau has never lost a chain. The Bureau has, on occasion, misplaced a pilot.
 
 ---
@@ -113,7 +115,8 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `l` | arm lazy |
 | `z` / `Z` | undo · redo |
 | `:` | focus the submission line |
-| `?` | reference · `q` quit |
+| `?` / `a` | reference · about |
+| `Ctrl+P` | command palette · `q` quit |
 
 ---
 
@@ -170,7 +173,8 @@ Wander accordingly.
 
 - **Interaction model** — inspired by [bashmapper](https://github.com/chloroken/bashmapper) by **chloroken** (MIT), a ~250-line bash script whose central insight — the chain is a tree, the paste is the truth, three letters address everything — survives here intact. No code is shared; the philosophy is.
 - **J-space reference data** — derived from [anoik.is](https://anoik.is)'s static bundle (which itself builds on CCP's Static Data Export), via the Anoikis Cartographic Bureau's own ingest. See [vagari/data/ATTRIBUTION.md](vagari/data/ATTRIBUTION.md).
-- **Sibling instruments** — [HARUSPEX](https://github.com/mogglemoss/haruspex) (proximity intelligence), from which VAGARI inherits its palette, its packaging, and its institutional temperament.
+- **Site intelligence** — the filing rules of the Ministry's ARCHAEOLOGY and INHALATION circulars, as codified in PANTOSCOPE's probe-scan parser and ported here.
+- **Sibling instruments** — [HARUSPEX](https://github.com/mogglemoss/haruspex) (proximity intelligence), from which VAGARI inherits its palette, its packaging, its mascot's genus, and its institutional temperament.
 
 ---
 

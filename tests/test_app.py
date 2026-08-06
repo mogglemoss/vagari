@@ -69,7 +69,9 @@ async def test_command_bar_open_and_nav(tmp_path):
         await pilot.press("enter")
         await pilot.pause()
         assert app.session.chain.current().name == "J154535"
-        assert "J154535" in str(app.query_one("#app-header", Static).content)
+        assert "J154535" in str(
+            app.query_one("#header-breadcrumb", Static).content
+        )
 
 
 @pytest.mark.asyncio
@@ -167,6 +169,40 @@ async def test_follow_me_end_to_end(tmp_path, monkeypatch):
         await pilot.pause()
         assert app.session.chain.location == ["QLM", "ZAA"]
         assert "J100744" in tree_text(app.query_one(ChainTree))
+
+
+@pytest.mark.asyncio
+async def test_about_screen_and_header(tmp_path):
+    from vagari.ui.about_screen import AboutScreen
+    from vagari.ui.widgets import VagariHeader
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        header = app.query_one(VagariHeader)
+        breadcrumb = str(header.query_one("#header-breadcrumb", Static).content)
+        assert "J105443" in breadcrumb
+
+        await pilot.press("a")
+        await pilot.pause()
+        assert isinstance(app.screen, AboutScreen)
+        text = str(app.screen.query_one("#about-box", Static).content)
+        assert "bashmapper" in text and "anoik.is" in text
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(app.screen, AboutScreen)
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_site_intel(tmp_path):
+    from vagari.ui.detail_panel import DetailPanel
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("sig", [], "FIY"))  # Ruined Guristas Crystal Quarry
+        text = str(panel.content)
+        assert "NO NPCS" in text and "best containers" in text
 
 
 @pytest.mark.asyncio

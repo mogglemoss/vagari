@@ -186,6 +186,14 @@ data self-test, three-platform GitHub Actions matrix (pytest + build + frozen-bi
 smoke per platform, release on v* tags). Verified locally: frozen binary draws the full
 TUI in a pty and quits clean. Tag v0.4.0 (local; CI runs on first push to a remote).
 
+**M6 — site intelligence + polish.** ✅ DONE (2026-08-06). Site classifier ported from
+PANTOSCOPE's probeScan.ts (canonical in retrospex; AUGUR desktop vendors it): ghost
+sites TIMED, sleeper caches CACHE, Observatory/AEGIS traps, sleeper relic/data class
+bands, unguarded pirate tiers with worth lines, gas reservoir contents to the unit —
+no price checks by design. Rendered in the sig detail panel. Plus: animated mascot
+header (HARUSPEX genus), about screen (`a`), Ministry-issue command palette, and
+random Bureau farewells on quit. 89 tests.
+
 ## Risks / open items
 
 - **Probe-scanner clipboard format drift / localization**: parse defensively, keep

@@ -46,6 +46,7 @@ _HELP_TEXT = """\
   [bold]k[/bold] / [bold]k162[/bold]   file an unmapped arrival as K162
   [bold]:[/bold]        focus the submission line
   [bold]?[/bold]        show / close this reference
+  [bold]a[/bold]        about — the instrument's papers
   [bold]q[/bold]        quit
 
 [#7a756e]THE BUREAU MAKES NO REPRESENTATIONS REGARDING

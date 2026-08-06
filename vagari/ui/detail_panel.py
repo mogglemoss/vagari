@@ -7,6 +7,7 @@ from textual.widgets import Static
 from vagari.model.chain import System
 from vagari.model.lifetime import LifeStatus, assess, hours_text
 from vagari.parsers.catalog import lookup_system, lookup_wh_type
+from vagari.parsers.site_intel import classify_site, gas_contents
 from vagari.session import Session
 from vagari.ui.chain_tree import DIM, MUTED, RUST, TEXT, WARN, age_text
 
@@ -99,6 +100,20 @@ class DetailPanel(Static):
             f"[{MUTED}]first noted {age_text(sig.first_seen)} ago · "
             f"last confirmed {age_text(sig.last_seen)} ago[/{MUTED}]"
         )
+        verdict = classify_site(sig.group, sig.name)
+        if verdict is not None:
+            lines.append("")
+            badge_color = RUST if verdict.hazard else WARN
+            lines.append(
+                f"[bold {badge_color}]{verdict.label}[/bold {badge_color}] "
+                f"[{MUTED}]{verdict.note}[/{MUTED}]"
+            )
+            if verdict.worth:
+                lines.append(f"[{MUTED}]Worth: {verdict.worth}[/{MUTED}]")
+            clouds = gas_contents(sig.name)
+            if clouds:
+                contents = " · ".join(f"{c.units:,} × {c.gas}" for c in clouds)
+                lines.append(f"[{TEXT}]{contents}[/{TEXT}]")
         if conn is not None:
             lines.append("")
             lines.append(f"[{MUTED}]WORMHOLE — leads to[/{MUTED}] "

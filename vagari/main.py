@@ -16,9 +16,27 @@ from vagari.enrichers.activity import fetch_system_kills
 from vagari.followme.logtail import detect_chatlog_dir, tail_system_changes
 from vagari.model.store import Store
 from vagari.session import Session
+from vagari.ui.about_screen import AboutScreen
 from vagari.ui.chain_tree import ChainTree
 from vagari.ui.detail_panel import DetailPanel
 from vagari.ui.help_screen import HelpScreen
+from vagari.ui.widgets import VagariHeader
+
+# Printed to the terminal after the TUI closes. The Bureau signs off.
+FAREWELLS = [
+    "The Bureau notes your departure. The chain remains on file.",
+    "Your whereabouts are now a matter of speculation. The record is not.",
+    "VAGARI has stopped following you. Someone else may not have.",
+    "The map is saved. The territory was never the Bureau's responsibility.",
+    "Filed under: departed. The Bureau wishes you a boring transit.",
+    "Fly safe. Failing that, fly documented.",
+    "The instrument rests. The holes do not.",
+    "Custody of the chain reverts to memory. The Bureau recommends against this.",
+    "Your signatures will despawn. The paperwork is forever.",
+    "The Bureau has never lost a pilot. It has lost several records of pilots.",
+    "Departure noted at [no timestamp]. Clocks are a k-space affectation.",
+    "Wander accordingly.",
+]
 
 BRAND = "ANOIKIS CARTOGRAPHIC BUREAU"
 
@@ -44,6 +62,7 @@ class MapperApp(App):
         Binding("d", "sig_cmd('del')", "Strike", show=False),
         Binding("l", "arm_lazy", "Lazy", show=True),
         Binding("k", "file_k162", "File K162", show=False),
+        Binding("a", "show_about", "About", show=False),
         Binding("q", "quit", "Quit", show=True),
     ]
 
@@ -99,10 +118,13 @@ class MapperApp(App):
         yield SystemCommand(
             "Return to root", "Move ◉ YOU to the top of the chain", self.action_go_top
         )
+        yield SystemCommand(
+            "About", "The instrument's papers", self.action_show_about
+        )
         yield SystemCommand("Quit", "Close the instrument", self.action_quit)
 
     def compose(self) -> ComposeResult:
-        yield Static(id="app-header")
+        yield VagariHeader(id="app-header")
         with Horizontal(id="body"):
             yield ChainTree(self.session, id="chain-tree")
             yield DetailPanel(self.session, id="detail-panel")
@@ -163,12 +185,10 @@ class MapperApp(App):
     def refresh_all(self) -> None:
         tree = self.query_one(ChainTree)
         tree.rebuild()
-        self.query_one("#app-header", Static).update(
-            f"[bold #C15F3C]{self.TITLE}[/bold #C15F3C] "
-            f"[#7a756e]· {BRAND} · chain[/#7a756e] "
-            f"[#e8e6e3]{self.session.chain.name}[/#e8e6e3] "
-            f"[#7a756e]·[/#7a756e] [#e8e6e3]{self.session.breadcrumb()}[/#e8e6e3]"
-            + ("  [bold #d4a017]LAZY ARMED[/bold #d4a017]" if self.session.lazy_armed else "")
+        self.query_one(VagariHeader).update_state(
+            self.session.chain.name,
+            self.session.breadcrumb(),
+            self.session.lazy_armed,
         )
         self.session.dirty = False
 
@@ -242,6 +262,9 @@ class MapperApp(App):
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())
 
+    def action_show_about(self) -> None:
+        self.push_screen(AboutScreen())
+
     def action_focus_command(self) -> None:
         self.query_one("#command-bar", Input).focus()
 
@@ -295,6 +318,9 @@ def main() -> None:
         )
         return
     MapperApp().run()
+    import random
+
+    print(random.choice(FAREWELLS))
 
 
 if __name__ == "__main__":
