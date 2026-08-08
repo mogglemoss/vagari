@@ -181,11 +181,13 @@ class MapperApp(App):
                     self.session.pilot_lock = env_pilot
                 who = self.session.pilot_lock or "first pilot to jump"
                 self.status(f"Monitoring {chatlog_dir.name} — following {who}.")
+                self._follow_active = True
                 self.run_worker(
                     tail_local_files(chatlog_dir, self._on_local_event),
                     exclusive=True,
                     group="follow",
                 )
+                self.refresh_all()  # surface the NOT FOLLOWING hint immediately
         # Ages and lifetime countdowns tick; cursor position is preserved.
         self.set_interval(60, self._tick)
         if self.recon_enabled:
@@ -232,6 +234,7 @@ class MapperApp(App):
                 else None
             ),
             pilot=self.session.pilot_lock,
+            follow_active=getattr(self, "_follow_active", False),
         )
         self.session.dirty = False
 

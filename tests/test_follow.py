@@ -277,3 +277,23 @@ def test_unmapped_arrival_is_sticky_in_header(tmp_path):
 
     header = asyncio.run(run())
     assert "UNMAPPED: Vard" in header and "press k" in header
+
+
+def test_cold_start_shows_not_following_hint(tmp_path):
+    import asyncio
+
+    from textual.widgets import Static
+
+    from vagari.main import MapperApp
+
+    async def run() -> str:
+        sess = Session.open(Store(base_dir=tmp_path / "state"))
+        app = MapperApp(session=sess, recon=False, follow=False)
+        async with app.run_test() as pilot:
+            app._follow_active = True  # as if the tailer started, no lock yet
+            app.refresh_all()
+            await pilot.pause()
+            return str(app.query_one("#header-status", Static).content)
+
+    header = asyncio.run(run())
+    assert "NOT FOLLOWING" in header and "pilot" in header

@@ -84,6 +84,7 @@ class VagariHeader(Horizontal):
         lazy_armed: bool,
         pending_arrival: str | None = None,
         pilot: str | None = None,
+        follow_active: bool = False,
     ) -> None:
         self.query_one("#header-breadcrumb", Static).update(
             f"[#7a756e]chain[/#7a756e] [#e8e6e3]{chain_name}[/#e8e6e3] "
@@ -100,6 +101,13 @@ class VagariHeader(Horizontal):
             )
         if lazy_armed:
             badges.append("[bold #d4a017]LAZY ARMED[/bold #d4a017]")
+        if follow_active and pilot is None and not pending_arrival:
+            # Cold start with no lock: without this, an idle multibox fleet
+            # makes follow-me look broken — nothing moves until someone jumps.
+            badges.append(
+                "[#d4a017]NOT FOLLOWING — submit `pilot <name>` to choose "
+                "(first pilot to jump otherwise)[/#d4a017]"
+            )
         self.query_one("#header-status", Static).update("  ".join(badges))
 
     def flare(self) -> None:
