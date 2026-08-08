@@ -440,13 +440,37 @@ class Session:
         if sig is None:
             raise ChainError(f"no signature {old.upper()[:3]!r} in {here.name}")
         new_prefix = new.upper()[:3]
-        if here.find_sig(new_prefix) is not None:
-            raise ChainError(f"{new_prefix} already exists here")
         old_prefix = sig.prefix
+        conn = here.find_connection(old_prefix)
+        target = here.find_sig(new_prefix)
+        if target is not None:
+            # The real signature is already on file (pasted after scanning):
+            # absorb the placeholder into it. The scanned record keeps its
+            # true id, name, and signal; the connection re-points.
+            if here.find_connection(new_prefix) is not None:
+                raise ChainError(
+                    f"{new_prefix} is itself an opened wormhole — refile "
+                    "would merge two connections"
+                )
+            if target.group not in (SigGroup.WORMHOLE, SigGroup.UNKNOWN):
+                raise ChainError(
+                    f"{new_prefix} is filed as a {target.group.value}, not a "
+                    "wormhole — check the prefix"
+                )
+            here.sigs.remove(sig)
+            target.group = SigGroup.WORMHOLE
+            if sig.label and sig.label != "K162 (unscanned)":
+                target.label = target.label or sig.label
+            if conn is not None:
+                conn.sig_prefix = new_prefix
+            self._commit()
+            return (
+                f"{old_prefix} absorbed into {new_prefix} — the placeholder "
+                "is struck, the connection stands."
+            )
         sig.sig_id = f"{new_prefix}-000"
         if sig.label == "K162 (unscanned)":
             sig.label = ""
-        conn = here.find_connection(old_prefix)
         if conn is not None:
             conn.sig_prefix = new_prefix
         self._commit()

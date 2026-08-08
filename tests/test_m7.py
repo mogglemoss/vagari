@@ -60,8 +60,29 @@ def test_rekey_placeholder_preserves_subtree(session):
 
 
 def test_rekey_rejects_collisions(session):
-    assert "REFUSED" in session.execute("rekey qlm fiy")
+    assert "REFUSED" in session.execute("rekey qlm fiy")  # FIY is a relic
     assert "REFUSED" in session.execute("rekey zzz abc")
+
+
+def test_rekey_absorbs_scanned_real_sig(session):
+    """The common flow: file a K162, then paste — the real sig appears as its
+    own row; rekey absorbs the placeholder into the scanned record."""
+    session.follow("J100744")
+    session.file_k162()          # ZAA → J100744
+    session.execute("up")
+    session.ingest(
+        "KDX-427\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t2 AU"
+    )
+    msg = session.execute("zaa = kdx")
+    assert "absorbed into KDX" in msg
+    here = session.chain.current()
+    assert here.find_sig("ZAA") is None
+    kdx = here.find_sig("KDX")
+    assert kdx.sig_id == "KDX-427"      # the real scanned id survives
+    assert kdx.signal == 100.0
+    conn = here.find_connection("KDX")
+    assert conn is not None and conn.child.name == "J100744"
+    assert conn.wh_type == "K162"
 
 
 # -- cull --------------------------------------------------------------------
