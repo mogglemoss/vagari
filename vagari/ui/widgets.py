@@ -81,10 +81,10 @@ class VagariHeader(Horizontal):
         self,
         chain_name: str,
         breadcrumb: str,
-        lazy_armed: bool,
         pending_arrival: str | None = None,
         pilot: str | None = None,
         follow_active: bool = False,
+        despawned: list | None = None,
     ) -> None:
         self.query_one("#header-breadcrumb", Static).update(
             f"[#7a756e]chain[/#7a756e] [#e8e6e3]{chain_name}[/#e8e6e3] "
@@ -99,8 +99,11 @@ class VagariHeader(Horizontal):
             badges.append(
                 f"[bold #C15F3C]UNMAPPED: {pending_arrival} — press k to file[/bold #C15F3C]"
             )
-        if lazy_armed:
-            badges.append("[bold #d4a017]LAZY ARMED[/bold #d4a017]")
+        if despawned:
+            names = " ".join(despawned)
+            badges.append(
+                f"[bold #d4a017]DESPAWNED: {names} — press s to sweep[/bold #d4a017]"
+            )
         if follow_active and pilot is None and not pending_arrival:
             # Cold start with no lock: without this, an idle multibox fleet
             # makes follow-me look broken — nothing moves until someone jumps.

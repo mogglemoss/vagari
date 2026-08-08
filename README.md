@@ -37,7 +37,7 @@ THE BUREAU IS MERELY NOTING.
 
 **Deposits are the only ingestion.** Ctrl+A, Ctrl+C in your probe scanner, paste anywhere in the instrument. New signatures are filed, existing ones are enriched — signal strength only rises, names only improve, your labels always survive. The paste is the source of truth and the Bureau reconciles against it; it does not argue with it.
 
-`lazy` arms strict reconciliation: the next deposit also reports which signatures have despawned, and `sweep` strikes them from the record. A wormhole with mapped systems behind it is never struck by a sweep. The Bureau does not shred files that other files refer to.
+Every deposit also reports which signatures have despawned; press `s` (or submit `sweep`) to strike them from the record. A wormhole with mapped systems behind it is never struck by a sweep. The Bureau does not shred files that other files refer to.
 
 **The map follows you.** VAGARI tails your EVE chat logs (locally; CCP writes them precisely so tools may read them — enable "Log chat to file" in EVE's settings) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Multiboxing is understood: every client's log is watched, each tagged with its pilot, and the Bureau follows the first pilot who actually jumps — the one being flown, not the one spamming Jita local. `pilot` reports the roster; `pilot <name>` locks to a character (`VAGARI_PILOT` env for a standing order); `pilot off` releases. Arrive somewhere unmapped and the Bureau notes the discrepancy and offers you a form: press `k` and the arrival is filed as a K162 with a placeholder signature, destination class, statics, and weather already annotated. Relabel it when you scan the real sig. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
 
@@ -92,8 +92,7 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | Submission | Effect |
 |------------|--------|
 | *paste* | deposit scan telemetry (implicit add) |
-| `lazy` | arm strict reconciliation for the next deposit |
-| `sweep` | strike despawned signatures from the record |
+| `sweep` | strike reported despawns (`s` from the map) |
 | `nav abc` | proceed through wormhole ABC |
 | `up` / `top` | return toward / to the root |
 | `abc J105443` | open ABC to a catalogued system (class, statics, weather) |
@@ -117,7 +116,6 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `1` `2` `3` | full · paths · gas views |
 | `e` `m` `x` `d` | EOL · mass · flag · strike (selected sig) |
 | `k` | file unmapped arrival as K162 |
-| `l` | arm lazy |
 | `z` / `Z` | undo · redo |
 | `:` | focus the submission line |
 | `?` / `a` | reference · about |

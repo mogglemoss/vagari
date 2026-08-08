@@ -211,7 +211,6 @@ async def test_command_palette_curated(tmp_path):
     app = make_app(tmp_path)
     commands = [c.title for c in app.get_system_commands(None)]
     assert "Recon: refresh activity" in commands
-    assert "Arm lazy reconciliation" in commands
     assert not any("theme" in c.lower() for c in commands)
     async with app.run_test() as pilot:
         await pilot.press("ctrl+p")
@@ -222,37 +221,50 @@ async def test_command_palette_curated(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_fzf_typing_starts_submission(tmp_path):
+async def test_tab_toggles_focus_and_no_bare_typing(tmp_path):
     from textual.widgets import Input
 
     app = make_app(tmp_path)
     async with app.run_test() as pilot:
         await paste(app, pilot, "paste_mixed.txt")
-        # 'n' is not an instant key: it should focus the bar seeded with 'n'.
+        # Bare letters no longer start a submission (fzf removed): 'n' does
+        # nothing, focus stays on the map.
         await pilot.press("n")
-        await pilot.pause()
-        assert isinstance(app.focused, Input)
-        await pilot.press(*"av qlm")
-        # No connection yet, so nav refuses — but the submission executed.
-        await pilot.press("enter")
-        await pilot.pause()
-        status = str(app.query_one("#status-line", Static).content)
-        assert "REFUSED" in status
-        assert not isinstance(app.focused, Input)  # focus returned to the map
-
-        # Instant keys still act instantly: 'z' undoes, no submission starts.
-        await pilot.press("z")
         await pilot.pause()
         assert not isinstance(app.focused, Input)
 
-        # Escape withdraws a started submission; pasting afterwards ingests.
-        await pilot.press("s")
+        # Tab hops to the submission line; typing works; Tab hops back.
+        await pilot.press("tab")
         await pilot.pause()
         assert isinstance(app.focused, Input)
-        await pilot.press("escape")
+        await pilot.press(*"nav qlm")
+        await pilot.press("enter")
         await pilot.pause()
+        assert "REFUSED" in str(app.query_one("#status-line", Static).content)
+        # Enter files the submission and hands focus back to the map …
+        assert not isinstance(app.focused, Input)
+        # … and Tab toggles in both directions.
+        await pilot.press("tab")
+        await pilot.pause()
+        assert isinstance(app.focused, Input)
+        await pilot.press("tab")
+        await pilot.pause()
+        assert not isinstance(app.focused, Input)
+
+
+@pytest.mark.asyncio
+async def test_sweep_key_and_badge(tmp_path):
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
         await paste(app, pilot, "paste_mixed.txt")
-        assert app.session.chain.current().sigs  # ingest reached the chain
+        await paste(app, pilot, "paste_second.txt")
+        header = str(app.query_one("#header-status", Static).content)
+        assert "DESPAWNED" in header and "press s" in header
+        await pilot.press("s")
+        await pilot.pause()
+        assert app.session.chain.current().find_sig("VMX") is None
+        header = str(app.query_one("#header-status", Static).content)
+        assert "DESPAWNED" not in header  # badge clears once swept
 
 
 @pytest.mark.asyncio

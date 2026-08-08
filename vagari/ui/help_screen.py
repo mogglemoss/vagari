@@ -14,18 +14,15 @@ _HELP_TEXT = """\
 [#3a3530]── how to drive it ──────────────────────[/#3a3530]
   [#e8e6e3]Paste scan telemetry any time the map
   has focus — no mode, no prompt.[/#e8e6e3]
-  [#e8e6e3]Bold single keys below act instantly.
-  Typing anything else starts a submission
+  [#e8e6e3]Bold single keys act on the map.
+  [bold]Tab[/bold] or [bold]:[/bold] moves to the submission line
   ([bold]nav qlm[/bold], [bold]htx J105443[/bold], …). [bold]Enter[/bold] files
-  it; [bold]Esc[/bold] withdraws it.[/#e8e6e3]
-  [#e8e6e3]If a submission begins with an instant
-  key's letter ([bold]eol[/bold], [bold]del[/bold], a sig like EAB),
-  press [bold]:[/bold] first — [bold]:[/bold] always works.[/#e8e6e3]
+  it; [bold]Esc[/bold] or [bold]Tab[/bold] returns to the map.[/#e8e6e3]
 
 [#3a3530]── deposits ─────────────────────────────[/#3a3530]
-  [italic]paste[/italic]      deposit scan telemetry (implicit add)
-  [bold]lazy[/bold]       arm reconciliation for next deposit
-  [bold]sweep[/bold]      strike despawned sigs from record
+  [italic]paste[/italic]      deposit scan telemetry; despawn
+             candidates are reported every time
+  [bold]s[/bold] / [bold]sweep[/bold]  strike reported despawns
 
 [#3a3530]── navigation ───────────────────────────[/#3a3530]
   [bold]nav abc[/bold]    proceed through wormhole ABC

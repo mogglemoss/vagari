@@ -86,14 +86,16 @@ def test_del_guard_and_force(session):
     assert session.chain.current().find_sig("QLM") is None
 
 
-def test_lazy_and_sweep(session):
-    session.execute("lazy")
-    assert session.lazy_armed
+def test_despawn_reporting_always_on(session):
+    # No arming: every deposit reports despawn candidates; sweep strikes.
     msg = session.ingest((FIXTURES / "paste_second.txt").read_text())
-    assert "DESPAWNED" in msg and not session.lazy_armed
-    session.execute("sweep")
+    assert "DESPAWNED" in msg
+    assert session.chain.current().find_sig("VMX") is not None  # report only
+    msg = session.execute("sweep")
+    assert "Struck" in msg
     assert session.chain.current().find_sig("VMX") is None
-    assert session.chain.current().find_sig("FIY") is None
+    # `lazy` remains a polite no-op pointing at the new behavior.
+    assert "sweep" in session.execute("lazy")
 
 
 def test_views(session):

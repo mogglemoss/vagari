@@ -28,7 +28,6 @@ class Session:
     store: Store
     chain: Chain
     view: str = "full"
-    lazy_armed: bool = False
     last_report: ReconcileReport | None = None
     dirty: bool = field(default=False, init=False)  # set when chain changed (UI refresh)
     # ESI system-kill enrichment: system_id → SystemActivity; None until fetched.
@@ -75,9 +74,9 @@ class Session:
         lines = parse_scan(text)
         if not lines:
             return "Nothing legible in that deposit. The Bureau is merely noting."
-        lazy = self.lazy_armed
-        self.lazy_armed = False
-        report = reconcile(self.chain.current(), lines, lazy=lazy)
+        # Every deposit reports despawn candidates; `sweep` is the only
+        # destructive step, so reporting costs nothing and forgets nothing.
+        report = reconcile(self.chain.current(), lines, lazy=True)
         self.last_report = report
         self._commit()
         parts = []
@@ -134,8 +133,10 @@ class Session:
             self.dirty = True
             return f"View: {head}."
         if head == "lazy":
-            self.lazy_armed = True
-            return "LAZY ARMED: next deposit reconciles against the full sig list."
+            return (
+                "Deposits always report despawn candidates now; "
+                "`sweep` strikes them."
+            )
         if head == "add":
             return "Deposits are implicit: paste scan telemetry directly."
         if head == "sweep":
@@ -388,10 +389,12 @@ class Session:
         if arg.lower() == "off":
             self._set_pilot_lock(None)
             return "Lock released — following the first pilot to jump."
-        match = next(
-            (p for p in self.known_pilots if p.lower() == arg.lower()), None
-        )
-        pilot = match or arg
+        wanted = arg.lower()
+        exact = [p for p in self.known_pilots if p.lower() == wanted]
+        prefixed = [p for p in self.known_pilots if p.lower().startswith(wanted)]
+        if not exact and len(prefixed) > 1:
+            return f"Ambiguous: {', '.join(sorted(prefixed))}."
+        pilot = exact[0] if exact else (prefixed[0] if prefixed else arg)
         self._set_pilot_lock(pilot)
         known = self.known_pilots.get(pilot)
         if known:

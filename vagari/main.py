@@ -49,6 +49,7 @@ class MapperApp(App):
     BINDINGS = [
         Binding("question_mark", "show_help", "Reference", show=True),
         Binding("colon", "focus_command", "Submit", show=True),
+        Binding("tab", "toggle_focus", "Map⇄Submit", show=True, priority=True),
         Binding("z", "undo", "Undo", show=True),
         Binding("Z", "redo", "Redo", show=False),
         Binding("u", "go_up", "Up", show=False),
@@ -60,7 +61,7 @@ class MapperApp(App):
         Binding("m", "sig_cmd('crit')", "Mass", show=False),
         Binding("x", "sig_cmd('flag')", "Flag", show=False),
         Binding("d", "sig_cmd('del')", "Strike", show=False),
-        Binding("l", "arm_lazy", "Lazy", show=True),
+        Binding("s", "sweep", "Sweep", show=True),
         Binding("c", "copy_chain", "Copy", show=True),
         Binding("k", "file_k162", "File K162", show=False),
         Binding("a", "show_about", "About", show=False),
@@ -86,11 +87,6 @@ class MapperApp(App):
         Textual's defaults (theme switching would undermine the Ministry)."""
         yield SystemCommand(
             "Reference", "Show the instrument reference (?)", self.action_show_help
-        )
-        yield SystemCommand(
-            "Arm lazy reconciliation",
-            "Next deposit reports despawned signatures",
-            self.action_arm_lazy,
         )
         yield SystemCommand(
             "Sweep despawned",
@@ -150,7 +146,7 @@ class MapperApp(App):
             id="status-line",
         )
         yield Input(
-            placeholder="submission — e.g.  nav abc · abc J105443 · lazy · ? for reference",
+            placeholder="submission — e.g.  nav abc · abc J105443 · sweep · ? for reference",
             id="command-bar",
         )
         yield Footer()
@@ -227,7 +223,6 @@ class MapperApp(App):
         self.query_one(VagariHeader).update_state(
             self.session.chain.name,
             self.session.breadcrumb(),
-            self.session.lazy_armed,
             pending_arrival=(
                 self.session.pending_arrival[0]
                 if self.session.pending_arrival
@@ -235,6 +230,11 @@ class MapperApp(App):
             ),
             pilot=self.session.pilot_lock,
             follow_active=getattr(self, "_follow_active", False),
+            despawned=(
+                self.session.last_report.despawned
+                if self.session.last_report
+                else []
+            ),
         )
         self.session.dirty = False
 
@@ -283,30 +283,17 @@ class MapperApp(App):
             text = text[1:].strip()
         self._after_engine(self.session.execute(text))
 
-    # Keys that act instantly when the map has focus; any other letter or
-    # digit starts a submission fzf-style. Submissions that begin with one
-    # of these letters need the explicit `:` first.
-    _INSTANT_KEYS = set("123acdegklmquxzZ?")
-
     def on_key(self, event: events.Key) -> None:
-        if isinstance(self.focused, Input):
-            if event.key == "escape":
-                self.query_one(ChainTree).focus()
-                event.stop()
-            return
-        ch = event.character
-        if (
-            ch
-            and ch.isalnum()
-            and len(event.key) == 1  # plain keypress, no ctrl/meta chords
-            and ch not in self._INSTANT_KEYS
-        ):
-            bar = self.query_one("#command-bar", Input)
-            bar.focus()
-            bar.value = ch
-            bar.cursor_position = len(bar.value)
+        if isinstance(self.focused, Input) and event.key == "escape":
+            self.query_one(ChainTree).focus()
             event.stop()
-            event.prevent_default()
+
+    def action_toggle_focus(self) -> None:
+        """Tab hops between the map and the submission line."""
+        if isinstance(self.focused, Input):
+            self.query_one(ChainTree).focus()
+        else:
+            self.query_one("#command-bar", Input).focus()
 
     # -- tree selection ------------------------------------------------------
 
@@ -427,6 +414,9 @@ class MapperApp(App):
 
     def action_file_k162(self) -> None:
         self._after_engine(self.session.file_k162())
+
+    def action_sweep(self) -> None:
+        self._after_engine(self.session.execute("sweep"))
 
     def action_copy_chain(self) -> None:
         from vagari.export import export_text
