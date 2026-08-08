@@ -9,7 +9,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from vagari.model.chain import Chain, ChainError, MassState, Signature, SigGroup
+from vagari.model.chain import (
+    Chain, ChainError, Connection, MassState, Signature, SigGroup, System,
+)
 from vagari.model.reconcile import ReconcileReport, apply_despawn, reconcile
 from vagari.model.store import Store
 from vagari.parsers.catalog import lookup_system, lookup_wh_type
@@ -102,6 +104,14 @@ class Session:
             return f"REFUSED: {err}"
 
     def _dispatch(self, head: str, rest: list[str], raw: str) -> str:
+        # An @System token anywhere addresses a signature in that system;
+        # without it, sigs resolve current-system-first, then chain-wide.
+        at = None
+        for i, tok in enumerate(rest):
+            if tok.startswith("@") and len(tok) > 1:
+                at = tok[1:]
+                rest = rest[:i] + rest[i + 1:]
+                break
         if head == "undo":
             return self.undo()
         if head == "redo":
@@ -132,20 +142,32 @@ class Session:
             return self._sweep(force="!" in rest or "force" in rest)
         if head == "flag" and rest:
             for prefix in rest:
-                self.chain.flag_sig(prefix)
+                _, _, sig = self._locate(prefix, at)
+                sig.flagged = True
             self._commit()
             return f"Flagged: {' '.join(p.upper()[:3] for p in rest)}."
         if head in ("del", "del!") and rest:
             removed = []
             for prefix in rest:
-                self.chain.delete_sig(prefix, force=head == "del!")
-                removed.append(prefix.upper()[:3])
+                path, system, sig = self._locate(prefix, at)
+                system.remove_sig(prefix, force=head == "del!")
+                lp = len(path)
+                if (
+                    self.chain.location[:lp] == path
+                    and len(self.chain.location) > lp
+                    and self.chain.location[lp] == sig.prefix
+                ):
+                    # We were inside the deleted branch; fall back to its origin.
+                    self.chain.location = list(path)
+                removed.append(sig.prefix)
             self._commit()
             return f"Struck from record: {' '.join(removed)}."
         if head == "eol" and rest:
-            return self._eol(rest[0])
+            return self._eol(rest[0], at)
         if head == "crit" and rest:
-            return self._mass(rest[0])
+            return self._mass(rest[0], at)
+        if head == "return" and rest:
+            return self._set_return(rest[0], at)
         if head == "chain" and rest:
             return self._switch_chain(rest[0])
         if head == "pilot":
@@ -156,13 +178,13 @@ class Session:
         if head == "k162":
             return self.file_k162()
         if head == "rekey" and len(rest) == 2:
-            return self._rekey(rest[0], rest[1])
+            return self._rekey(rest[0], rest[1], at)
         if len(rest) == 2 and rest[0] == "=" and _PREFIX.match(head):
-            return self._rekey(head, rest[1])
+            return self._rekey(head, rest[1], at)
         if head in ("cull", "cull!"):
             return self._cull(force=head == "cull!")
         if _PREFIX.match(head) and rest:
-            return self._sig_command(head, rest)
+            return self._sig_command(head, rest, at)
         return f"Unrecognised submission: {raw!r}. See `?` for accepted forms."
 
     # -- helpers -------------------------------------------------------------
@@ -180,23 +202,80 @@ class Session:
         self._commit()
         return f"Struck from record: {' '.join(removed)}." if removed else "Nothing swept."
 
-    def _eol(self, prefix: str) -> str:
-        conn = self.chain.current().find_connection(prefix)
+    def _locate(self, prefix: str, at: str | None = None):
+        """Resolve a signature prefix anywhere in the chain.
+
+        Returns (path, system, sig). Preference order: an @System qualifier;
+        the current system; a unique match chain-wide. Ambiguity is an error
+        naming the candidate systems — the Bureau does not guess.
+        """
+        p = prefix.upper()[:3]
+        matches: list[tuple[list[str], System]] = []
+
+        def walk(path: list[str], system: System) -> None:
+            if system.find_sig(p) is not None:
+                matches.append((path, system))
+            for conn in system.connections:
+                walk(path + [conn.sig_prefix], conn.child)
+
+        walk([], self.chain.root)
+        if at is not None:
+            matches = [m for m in matches if m[1].name.lower() == at.lower()]
+            if not matches:
+                raise ChainError(f"no signature {p!r} in {at}")
+        if not matches:
+            raise ChainError(f"no signature {p!r} anywhere on this chain")
+        if len(matches) > 1:
+            here = self.chain.current()
+            preferred = [m for m in matches if m[1] is here]
+            if preferred:
+                matches = preferred
+            else:
+                names = ", ".join(m[1].name for m in matches)
+                raise ChainError(f"{p} exists in {names} — qualify with @system")
+        path, system = matches[0]
+        return path, system, system.find_sig(p)
+
+    def _connection_of(self, prefix: str, at: str | None):
+        path, system, _sig = self._locate(prefix, at)
+        conn = system.find_connection(prefix)
         if conn is None:
-            raise ChainError(f"{prefix.upper()[:3]} is not an opened wormhole")
+            raise ChainError(
+                f"{prefix.upper()[:3]} in {system.name} is not an opened wormhole"
+            )
+        return system, conn
+
+    def _eol(self, prefix: str, at: str | None = None) -> str:
+        system, conn = self._connection_of(prefix, at)
         conn.eol = not conn.eol
         self._commit()
         state = "END OF LIFE" if conn.eol else "no longer EOL"
-        return f"{conn.sig_prefix} marked {state}."
+        return f"{conn.sig_prefix} ({system.name}) marked {state}."
 
-    def _mass(self, prefix: str) -> str:
-        conn = self.chain.current().find_connection(prefix)
-        if conn is None:
-            raise ChainError(f"{prefix.upper()[:3]} is not an opened wormhole")
+    def _mass(self, prefix: str, at: str | None = None) -> str:
+        system, conn = self._connection_of(prefix, at)
         cycle = [MassState.FRESH, MassState.REDUCED, MassState.CRITICAL]
         conn.mass = cycle[(cycle.index(conn.mass) + 1) % 3]
         self._commit()
-        return f"{conn.sig_prefix} mass: {conn.mass.value.upper()}."
+        return f"{conn.sig_prefix} ({system.name}) mass: {conn.mass.value.upper()}."
+
+    def _set_return(self, prefix: str, at: str | None = None) -> str:
+        """Explicitly pair a signature with the hole its system was entered
+        through — never assumed, always stated."""
+        path, system, sig = self._locate(prefix, at)
+        if not path:
+            raise ChainError(
+                f"{system.name} is the root — no inbound hole to return through"
+            )
+        parent = self.chain.system_at(path[:-1])
+        inbound = parent.find_connection(path[-1])
+        sig.group = SigGroup.WORMHOLE
+        inbound.return_prefix = sig.prefix
+        self._commit()
+        return (
+            f"{sig.prefix} filed as the return side of {inbound.sig_prefix} "
+            f"— home to {parent.name}."
+        )
 
     def _switch_chain(self, name: str) -> str:
         self.chain = self.store.load_latest(name) or Chain(name=name)
@@ -206,35 +285,48 @@ class Session:
         self.dirty = True
         return f"Chain of custody: {name}."
 
-    def _sig_command(self, prefix: str, rest: list[str]) -> str:
+    def _sig_command(self, prefix: str, rest: list[str], at: str | None = None) -> str:
         arg = rest[0]
         if _JCODE.match(arg):
-            return self._open_jcode(prefix, arg)
+            return self._open_jcode(prefix, arg, at)
         wh_type = lookup_wh_type(arg)
         if wh_type is not None and len(rest) == 1:
-            return self._set_wh_type(prefix, wh_type.code)
+            return self._set_wh_type(prefix, wh_type.code, at)
         label = " ".join(rest)
-        sig = self.chain.label_sig(prefix, label)
+        _, system, sig = self._locate(prefix, at)
+        sig.label = label
         self._commit()
-        return f"{sig.prefix} labelled {label!r}."
+        return f"{sig.prefix} ({system.name}) labelled {label!r}."
 
-    def _open_jcode(self, prefix: str, jcode: str) -> str:
+    def _open_at(self, system: System, prefix: str, dest: str, *,
+                 jclass=None, statics=None, effect=None, wh_type=None) -> Connection:
+        sig = self._require_prefix(system, prefix)
+        if system.find_connection(prefix) is not None:
+            raise ChainError(f"{sig.prefix} is already opened")
+        sig.group = SigGroup.WORMHOLE
+        child = System(name=dest, jclass=jclass, statics=statics, effect=effect)
+        conn = Connection(sig_prefix=sig.prefix, child=child, wh_type=wh_type)
+        system.connections.append(conn)
+        return conn
+
+    def _open_jcode(self, prefix: str, jcode: str, at: str | None = None) -> str:
         info = lookup_system(jcode)
-        here = self.chain.current()
-        if here.find_connection(prefix) is not None:
-            raise ChainError(f"{prefix.upper()[:3]} is already opened")
+        _, system, _sig = self._locate(prefix, at)
         if info is not None:
-            conn = self.chain.open_connection(
-                prefix, info.jcode, jclass=info.jclass,
+            conn = self._open_at(
+                system, prefix, info.jcode, jclass=info.jclass,
                 statics=info.static_display, effect=info.effect,
             )
             self._commit()
             eff = f" · {info.effect}" if info.effect else ""
-            return f"{conn.sig_prefix} → {info.jcode} [{info.jclass}+{info.static_display}{eff}]."
+            return (
+                f"{conn.sig_prefix} ({system.name}) → {info.jcode} "
+                f"[{info.jclass}+{info.static_display}{eff}]."
+            )
         name = jcode.upper() if jcode.upper().startswith("J") else f"J{jcode}"
-        conn = self.chain.open_connection(prefix, name)
+        conn = self._open_at(system, prefix, name)
         self._commit()
-        return f"{conn.sig_prefix} → {name} [not in Bureau records]."
+        return f"{conn.sig_prefix} ({system.name}) → {name} [not in Bureau records]."
 
     def _require_prefix(self, system, prefix: str) -> Signature:
         sig = system.find_sig(prefix)
@@ -242,37 +334,24 @@ class Session:
             raise ChainError(f"no signature {prefix.upper()[:3]!r} in {system.name}")
         return sig
 
-    def _set_wh_type(self, prefix: str, code: str) -> str:
+    def _set_wh_type(self, prefix: str, code: str, at: str | None = None) -> str:
         wh_type = lookup_wh_type(code)
-        here = self.chain.current()
-        conn = here.find_connection(prefix)
-        # A K162 typed inside a mapped system is the way home: pair it with
-        # the connection we came through instead of opening a new branch.
-        if (
-            conn is None
-            and wh_type.code == "K162"
-            and self.chain.location
-        ):
-            parent = self.chain.system_at(self.chain.location[:-1])
-            inbound = parent.find_connection(self.chain.location[-1])
-            if inbound is not None and inbound.return_prefix is None:
-                sig = self._require_prefix(here, prefix)
-                sig.group = SigGroup.WORMHOLE
-                inbound.return_prefix = sig.prefix
-                self._commit()
-                return (
-                    f"{sig.prefix} filed as the return side of "
-                    f"{inbound.sig_prefix} — home to {parent.name}."
-                )
+        _, system, _sig = self._locate(prefix, at)
+        conn = system.find_connection(prefix)
         if conn is None:
-            conn = self.chain.open_connection(prefix, "?", jclass=wh_type.target_display
-                                              if wh_type.target_class else None,
-                                              wh_type=code)
+            conn = self._open_at(
+                system, prefix, "?",
+                jclass=wh_type.target_display if wh_type.target_class else None,
+                wh_type=code,
+            )
         else:
             conn.wh_type = code
         self._commit()
         life = f", {wh_type.lifetime_hours:g}h" if wh_type.lifetime_hours else ""
-        return f"{conn.sig_prefix} typed {code} (→{wh_type.target_display}{life})."
+        return (
+            f"{conn.sig_prefix} ({system.name}) typed {code} "
+            f"(→{wh_type.target_display}{life})."
+        )
 
     # -- follow-me (chatlog) -------------------------------------------------
 
@@ -478,28 +557,13 @@ class Session:
                 return prefix
         raise ChainError("no placeholder prefixes left; the Bureau is impressed")
 
-    def _rekey(self, old: str, new: str) -> str:
+    def _rekey(self, old: str, new: str, at: str | None = None) -> str:
         """Refile a signature under its real prefix — for K162 placeholders
         whose true signature has since been scanned. Preserves the connection
-        and everything mapped behind it."""
+        and everything mapped behind it. Resolves anywhere in the chain."""
         if not _PREFIX.match(new):
             raise ChainError(f"{new!r} is not a signature prefix")
-        # The natural moment to refile a placeholder is from INSIDE the hole
-        # you just filed — so look in the current system first, then one up.
-        candidates = [self.chain.current()]
-        if self.chain.location:
-            candidates.append(self.chain.system_at(self.chain.location[:-1]))
-        here = sig = None
-        for system in candidates:
-            found = system.find_sig(old)
-            if found is not None:
-                here, sig = system, found
-                break
-        if sig is None:
-            raise ChainError(
-                f"no signature {old.upper()[:3]!r} in "
-                f"{' or '.join(s.name for s in candidates)}"
-            )
+        path, here, sig = self._locate(old, at)
         new_prefix = new.upper()[:3]
         old_prefix = sig.prefix
         conn = here.find_connection(old_prefix)
@@ -512,8 +576,7 @@ class Session:
             target_conn = here.find_connection(new_prefix)
             if target_conn is not None:
                 # Two connections merge only when the target's far side is an
-                # empty unknown — the duplicate-sibling case (a placeholder
-                # filed for an arrival that was really this opened hole).
+                # empty unknown — the duplicate-sibling case.
                 if target_conn.child.name == "?" and not (
                     target_conn.child.sigs or target_conn.child.connections
                 ):
@@ -525,15 +588,11 @@ class Session:
                     target_conn.child = conn.child
                     if not target_conn.wh_type:
                         target_conn.wh_type = conn.wh_type
+                    if not target_conn.return_prefix:
+                        target_conn.return_prefix = conn.return_prefix
                     here.connections.remove(conn)
                     here.sigs.remove(sig)
-                    if (
-                        self.chain.location
-                        and self.chain.location[-1] == old_prefix
-                        and len(candidates) > 1
-                        and here is candidates[1]
-                    ):
-                        self.chain.location[-1] = new_prefix
+                    self._fix_location(path, old_prefix, new_prefix)
                     self._commit()
                     return (
                         f"{old_prefix} merged into {new_prefix} — the unknown "
@@ -564,16 +623,19 @@ class Session:
 
         if conn is not None:
             conn.sig_prefix = new_prefix
-        if (
-            self.chain.location
-            and self.chain.location[-1] == old_prefix
-            and len(candidates) > 1
-            and here is candidates[1]
-        ):
-            # We are standing inside this very hole; the path follows the rename.
-            self.chain.location[-1] = new_prefix
+        self._fix_location(path, old_prefix, new_prefix)
         self._commit()
         return message
+
+    def _fix_location(self, path: list[str], old_prefix: str, new_prefix: str) -> None:
+        """If the renamed connection lies on the location path, follow it."""
+        lp = len(path)
+        if (
+            self.chain.location[:lp] == path
+            and len(self.chain.location) > lp
+            and self.chain.location[lp] == old_prefix
+        ):
+            self.chain.location[lp] = new_prefix
 
     def _cull(self, force: bool = False) -> str:
         """Strike connections past their book lifetime (EXPIRED in the tree)."""

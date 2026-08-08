@@ -37,6 +37,10 @@ _HELP_TEXT = """\
   [bold]abc J105443[/bold]   open ABC to a catalogued system
   [bold]abc H296[/bold]      type wormhole ABC (class, life)
   [bold]abc <words>[/bold]   label a signature
+  [bold]return abc[/bold]    abc is the way home (pairs with
+             the hole its system was entered by)
+  [bold]… @system[/bold]    address a sig in a named system;
+             otherwise: current first, then unique
   [bold]here <name>[/bold]   name the current system
   [bold]flag abc[/bold] / [bold]x[/bold] flag · [bold]del abc[/bold] / [bold]d[/bold] strike
   [bold]eol abc[/bold] / [bold]e[/bold]  toggle end-of-life

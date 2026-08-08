@@ -99,6 +99,8 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `abc J105443` | open ABC to a catalogued system (class, statics, weather) |
 | `abc H296` | type wormhole ABC (target class, lifetime, mass) |
 | `abc <words>` | label a signature |
+| `return abc` | mark ABC as the return side of its system's inbound hole |
+| `… @system` | address a sig elsewhere in the chain (else: current, then unique) |
 | `here <name>` | name the current system |
 | `flag abc` / `del abc` | flag · strike (`del!` forces) |
 | `eol abc` / `crit abc` | toggle end-of-life · cycle mass state |

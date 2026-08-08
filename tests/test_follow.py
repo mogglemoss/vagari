@@ -101,29 +101,78 @@ def test_rekey_merges_duplicate_sibling(tmp_path):
     assert sess.chain.current().name == "J141150"
 
 
-def test_k162_typed_inside_pairs_with_inbound(tmp_path):
-    """`ina K162` while inside pairs INA with the hole we came through
-    instead of opening a new branch — one wormhole, two signatures."""
+def _mapped_session(tmp_path) -> Session:
     sess = Session.open(Store(base_dir=tmp_path / "state"))
     sess.chain.root.name = "J103529"
     sess.ingest("HUV-843\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t1 AU")
     sess.execute("huv U210")
     sess.follow("J141150")              # resolves the "?" and moves inside
     sess.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
+    return sess
 
-    msg = sess.execute("ina K162")
+
+def test_return_is_explicit_never_assumed(tmp_path):
+    """`return ina` pairs the sig with its system's inbound hole; typing a
+    sig as K162 always opens normally — the Bureau does not guess."""
+    sess = _mapped_session(tmp_path)
+
+    msg = sess.execute("return ina")
     assert "return side of HUV" in msg and "J103529" in msg
     inbound = sess.chain.root.find_connection("HUV")
     assert inbound.return_prefix == "INA"
-    # No new branch was opened in J141150.
-    assert sess.chain.current().connections == []
-    # A SECOND K162 typed here is a different hole — a normal open.
+    assert sess.chain.current().connections == []  # no branch opened
+
+    # K162 stays a plain open, even inside a mapped system.
     sess.ingest("QQQ-001\tCosmic Signature\tWormhole\t\t8.0%\t1 AU")
     sess.execute("qqq K162")
     assert sess.chain.current().find_connection("QQQ") is not None
+    assert inbound.return_prefix == "INA"  # untouched
+
     # Round-trips through the store.
     reloaded = Store(base_dir=tmp_path / "state").load_latest("home")
     assert reloaded.root.find_connection("HUV").return_prefix == "INA"
+
+
+def test_sigs_addressable_from_anywhere(tmp_path):
+    """Commands resolve sigs chain-wide — no need to stand in the system."""
+    sess = _mapped_session(tmp_path)
+    sess.execute("top")                  # stand at the root
+
+    # Label, eol, and return all reach INA / HUV's child from the root.
+    assert "labelled" in sess.execute("ina way home")
+    assert "return side of HUV" in sess.execute("return ina")
+    assert "END OF LIFE" in sess.execute("eol huv")
+
+    child = sess.chain.root.find_connection("HUV").child
+    assert child.find_sig("INA").label == "way home"
+
+    # Deleting a remote sig works too.
+    sess.execute("del ina")
+    assert child.find_sig("INA") is None
+
+
+def test_ambiguous_prefix_needs_qualifier(tmp_path):
+    sess = _mapped_session(tmp_path)
+    # Same prefix in both systems: AAB at root and inside J141150.
+    sess.execute("top")
+    sess.ingest("AAB-001\tCosmic Signature\tGas Site\t\t50.0%\t1 AU")
+    sess.execute("nav huv")
+    sess.ingest("AAB-002\tCosmic Signature\tRelic Site\t\t50.0%\t1 AU")
+    sess.execute("top")
+
+    # From the root, the current system's AAB wins silently.
+    assert "labelled" in sess.execute("aab mine")
+    assert sess.chain.root.find_sig("AAB").label == "mine"
+
+    # From a third place there is no tiebreak — refuse, then qualify.
+    sess.execute("nav huv")
+    child = sess.chain.current()
+    assert child.find_sig("AAB").label == ""   # current-system AAB wins here
+    sess.execute("top")
+    msg = sess.execute("flag aab @J141150")
+    assert "Flagged" in msg
+    assert child.find_sig("AAB").flagged
+    assert not sess.chain.root.find_sig("AAB").flagged
 
 
 def test_follow_unmapped_offers_k162(session):
