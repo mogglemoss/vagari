@@ -160,11 +160,15 @@ class DetailPanel(Static):
                          f"[{TEXT}]{conn.child.name}[/{TEXT}]")
             wh_type = lookup_wh_type(conn.wh_type) if conn.wh_type else None
             if wh_type is not None:
-                lines.append(
-                    f"[{MUTED}]{wh_type.code} → {wh_type.target_display} · "
-                    f"{wh_type.size} · lifetime {wh_type.lifetime_hours:g}h · "
-                    f"open {age_text(conn.opened_at)}[/{MUTED}]"
-                )
+                # K162s carry no book data — target, mass, and lifetime are
+                # all None; format only what the type actually declares.
+                bits = [f"{wh_type.code} → {wh_type.target_display}"]
+                if wh_type.size and wh_type.size != "unknown":
+                    bits.append(wh_type.size)
+                if wh_type.lifetime_hours:
+                    bits.append(f"lifetime {wh_type.lifetime_hours:g}h")
+                bits.append(f"open {age_text(conn.opened_at)}")
+                lines.append(f"[{MUTED}]{' · '.join(bits)}[/{MUTED}]")
                 mass_bits = []
                 if wh_type.total_mass:
                     mass_bits.append(f"total {human_mass(wh_type.total_mass)}")

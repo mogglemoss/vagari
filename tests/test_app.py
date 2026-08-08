@@ -334,6 +334,25 @@ async def test_kspace_rendering(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_k162_placeholder_detail_does_not_crash(tmp_path):
+    """Regression: K162 has no book lifetime/mass — the detail panel must
+    render a filed placeholder without formatting None."""
+    from vagari.ui.detail_panel import DetailPanel
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        app.session.follow_event("Hunter", "Vard", initial=False)
+        app.session.file_k162()
+        app.refresh_all()
+        await pilot.pause()
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("sig", [], "ZAA"))  # crashed before the fix
+        text = str(panel.content)
+        assert "K162" in text and "Vard" in text
+        assert "None" not in text
+
+
+@pytest.mark.asyncio
 async def test_view_filter(tmp_path):
     app = make_app(tmp_path)
     async with app.run_test() as pilot:
