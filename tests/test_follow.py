@@ -238,3 +238,42 @@ def test_pilot_lock_applies_initial_position(session):
     msg = session.follow_event("Hunter", "J154535", initial=True)
     assert msg is not None
     assert session.chain.location == ["QLM"]
+
+
+def test_pilot_lock_survives_restart(tmp_path):
+    store = Store(base_dir=tmp_path / "state")
+    sess = Session.open(store)
+    sess.chain.root.name = "J105443"
+    sess.follow_event("Hunter", "Jita", initial=False)  # auto-lock persists
+    assert sess.pilot_lock == "Hunter"
+
+    # A fresh session (restart) loads the lock, so initial replay syncs.
+    again = Session.open(Store(base_dir=tmp_path / "state"))
+    assert again.pilot_lock == "Hunter"
+
+    again.pilot_command("off")
+    third = Session.open(Store(base_dir=tmp_path / "state"))
+    assert third.pilot_lock is None
+
+
+def test_unmapped_arrival_is_sticky_in_header(tmp_path):
+    # UI-level: the pending arrival badge lives in the header, not just the
+    # transient status line that auto-recon overwrites.
+    import asyncio
+
+    from textual.widgets import Static
+
+    from vagari.main import MapperApp
+
+    async def run() -> str:
+        sess = Session.open(Store(base_dir=tmp_path / "state"))
+        sess.chain.root.name = "J103529"
+        app = MapperApp(session=sess, recon=False, follow=False)
+        async with app.run_test() as pilot:
+            sess.follow_event("Cormorant Fell", "Vard", initial=False)
+            app.refresh_all()
+            await pilot.pause()
+            return str(app.query_one("#header-status", Static).content)
+
+    header = asyncio.run(run())
+    assert "UNMAPPED: Vard" in header and "press k" in header

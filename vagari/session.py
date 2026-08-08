@@ -53,7 +53,13 @@ class Session:
         if chain is None:
             chain = Chain(name=name)
             store.commit(chain)
-        return cls(store=store, chain=chain)
+        session = cls(store=store, chain=chain)
+        session.pilot_lock = store.load_pilot()
+        return session
+
+    def _set_pilot_lock(self, pilot: str | None) -> None:
+        self.pilot_lock = pilot
+        self.store.save_pilot(pilot)
 
     def _commit(self, amend: bool = False) -> None:
         # amend=True for location-only changes: persisted, but not a new
@@ -260,7 +266,7 @@ class Session:
                 return self.follow(system)
             return None
         if self.pilot_lock is None:
-            self.pilot_lock = pilot
+            self._set_pilot_lock(pilot)
             moved = self.follow(system)
             return f"FOLLOWING {pilot}. " + (moved or "Position noted.")
         if pilot != self.pilot_lock:
@@ -277,13 +283,13 @@ class Session:
             lock = self.pilot_lock or "first pilot to jump"
             return f"Following: {lock}. On record: {roster}."
         if arg.lower() == "off":
-            self.pilot_lock = None
+            self._set_pilot_lock(None)
             return "Lock released — following the first pilot to jump."
         match = next(
             (p for p in self.known_pilots if p.lower() == arg.lower()), None
         )
         pilot = match or arg
-        self.pilot_lock = pilot
+        self._set_pilot_lock(pilot)
         known = self.known_pilots.get(pilot)
         if known:
             moved = self.follow(known)
@@ -295,6 +301,7 @@ class Session:
         chain = self.chain
         current = chain.current()
         if current.name == name:
+            self.pending_arrival = None  # back somewhere accounted for
             return None
 
         # Fresh chain: first observed system names the root.
@@ -304,6 +311,7 @@ class Session:
         for conn in current.connections:
             if conn.child.name == name:
                 chain.location.append(conn.sig_prefix)
+                self.pending_arrival = None
                 self._commit(amend=True)
                 return f"Followed you through {conn.sig_prefix} to {name}."
 
@@ -311,12 +319,14 @@ class Session:
             parent = chain.system_at(chain.location[:-1])
             if parent.name == name:
                 chain.location.pop()
+                self.pending_arrival = None
                 self._commit(amend=True)
                 return f"Followed you back up to {name}."
 
         found = self._find_system(name)
         if found is not None:
             chain.location = found
+            self.pending_arrival = None
             self._commit(amend=True)
             return f"Relocated ◉ YOU to {name} (elsewhere in the chain)."
 

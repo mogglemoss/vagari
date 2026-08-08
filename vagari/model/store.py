@@ -136,6 +136,23 @@ class Store:
         self._set_head(name, snaps[-1])
         return self._load(name, snaps[-1])
 
+    # -- follow-me pilot lock (app-level, survives restarts) -----------------
+
+    def load_pilot(self) -> str | None:
+        f = self.base_dir / "PILOT"
+        try:
+            return f.read_text().strip() or None
+        except OSError:
+            return None
+
+    def save_pilot(self, pilot: str | None) -> None:
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        f = self.base_dir / "PILOT"
+        if pilot:
+            f.write_text(pilot)
+        else:
+            f.unlink(missing_ok=True)
+
     def chains(self) -> list[str]:
         if not self.base_dir.exists():
             return []

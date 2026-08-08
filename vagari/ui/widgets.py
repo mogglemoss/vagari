@@ -77,14 +77,30 @@ class VagariHeader(Horizontal):
         self._esca_frame = 0
         self.set_interval(0.55, self._tick_esca)
 
-    def update_state(self, chain_name: str, breadcrumb: str, lazy_armed: bool) -> None:
+    def update_state(
+        self,
+        chain_name: str,
+        breadcrumb: str,
+        lazy_armed: bool,
+        pending_arrival: str | None = None,
+        pilot: str | None = None,
+    ) -> None:
         self.query_one("#header-breadcrumb", Static).update(
             f"[#7a756e]chain[/#7a756e] [#e8e6e3]{chain_name}[/#e8e6e3] "
             f"[#7a756e]·[/#7a756e] [#e8e6e3]{breadcrumb}[/#e8e6e3]"
+            + (f" [#7a756e]· following[/#7a756e] [#e8e6e3]{pilot}[/#e8e6e3]"
+               if pilot else "")
         )
-        self.query_one("#header-status", Static).update(
-            "[bold #d4a017]LAZY ARMED[/bold #d4a017]" if lazy_armed else ""
-        )
+        badges = []
+        if pending_arrival:
+            # Sticky until filed or superseded — the status line is transient
+            # and auto-recon used to bury this prompt.
+            badges.append(
+                f"[bold #C15F3C]UNMAPPED: {pending_arrival} — press k to file[/bold #C15F3C]"
+            )
+        if lazy_armed:
+            badges.append("[bold #d4a017]LAZY ARMED[/bold #d4a017]")
+        self.query_one("#header-status", Static).update("  ".join(badges))
 
     def flare(self) -> None:
         """Flare the esca out of cycle — something just happened."""

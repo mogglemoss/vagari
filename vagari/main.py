@@ -174,7 +174,11 @@ class MapperApp(App):
             else:
                 import os
 
-                self.session.pilot_lock = os.environ.get("VAGARI_PILOT") or None
+                # Env overrides for this run only; otherwise the persisted
+                # lock (loaded in Session.open) stands.
+                env_pilot = os.environ.get("VAGARI_PILOT")
+                if env_pilot:
+                    self.session.pilot_lock = env_pilot
                 who = self.session.pilot_lock or "first pilot to jump"
                 self.status(f"Monitoring {chatlog_dir.name} — following {who}.")
                 self.run_worker(
@@ -222,6 +226,12 @@ class MapperApp(App):
             self.session.chain.name,
             self.session.breadcrumb(),
             self.session.lazy_armed,
+            pending_arrival=(
+                self.session.pending_arrival[0]
+                if self.session.pending_arrival
+                else None
+            ),
+            pilot=self.session.pilot_lock,
         )
         self.session.dirty = False
 
