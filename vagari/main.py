@@ -20,6 +20,7 @@ from vagari.ui.about_screen import AboutScreen
 from vagari.ui.chain_tree import ChainTree
 from vagari.ui.detail_panel import DetailPanel
 from vagari.ui.help_screen import HelpScreen
+from vagari.ui.suggest import BureauSuggester
 from vagari.ui.widgets import VagariHeader
 
 # Printed to the terminal after the TUI closes. The Bureau signs off.
@@ -56,12 +57,16 @@ class MapperApp(App):
         Binding("g", "go_top", "Top", show=False),
         Binding("1", "set_view('full')", "Full", show=False),
         Binding("2", "set_view('paths')", "Paths", show=False),
-        Binding("3", "set_view('gas')", "Gas", show=False),
+        Binding("3", "set_view('sites')", "Sites", show=False),
+        Binding("4", "set_view('gas')", "Gas", show=False),
+        Binding("5", "set_view('combat')", "Combat", show=False),
         Binding("e", "sig_cmd('eol')", "EOL", show=False),
         Binding("m", "sig_cmd('crit')", "Mass", show=False),
         Binding("x", "sig_cmd('flag')", "Flag", show=False),
         Binding("d", "sig_cmd('del')", "Strike", show=False),
         Binding("s", "sweep", "Sweep", show=True),
+        Binding("y", "snap_to_you", "You", show=False),
+        Binding("h", "show_homeward", "Homeward", show=False),
         Binding("c", "copy_chain", "Copy", show=True),
         Binding("k", "file_k162", "File K162", show=False),
         Binding("a", "show_about", "About", show=False),
@@ -112,10 +117,22 @@ class MapperApp(App):
             "View: paths", "Wormholes only", lambda: self.action_set_view("paths")
         )
         yield SystemCommand(
+            "View: sites", "Wormholes, relic/data/ghost",
+            lambda: self.action_set_view("sites")
+        )
+        yield SystemCommand(
             "View: gas", "Wormholes and gas", lambda: self.action_set_view("gas")
         )
         yield SystemCommand(
+            "View: combat", "Wormholes and combat sites",
+            lambda: self.action_set_view("combat")
+        )
+        yield SystemCommand(
             "Return to root", "Move ◉ YOU to the top of the chain", self.action_go_top
+        )
+        yield SystemCommand(
+            "Homeward", "Show the route home, door by door",
+            self.action_show_homeward,
         )
         yield SystemCommand(
             "Copy chain", "Plain-text tree to the clipboard", self.action_copy_chain
@@ -148,6 +165,7 @@ class MapperApp(App):
         yield Input(
             placeholder="submission — e.g.  nav abc · abc J105443 · sweep · ? for reference",
             id="command-bar",
+            suggester=BureauSuggester(self.session),
         )
         yield Footer()
 
@@ -301,6 +319,10 @@ class MapperApp(App):
         self.query_one(DetailPanel).show_node(event.node.data)
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        tree = self.query_one(ChainTree)
+        if tree.suppress_click_nav:
+            tree.suppress_click_nav = False
+            return  # single click inspects; double-click or Enter proceeds
         data = event.node.data
         if data is None:
             return
@@ -414,6 +436,28 @@ class MapperApp(App):
 
     def action_file_k162(self) -> None:
         self._after_engine(self.session.file_k162())
+
+    def action_show_homeward(self) -> None:
+        self.status(self.session.homeward())
+
+    def action_snap_to_you(self) -> None:
+        tree = self.query_one(ChainTree)
+        if tree.move_to_data(("system", list(self.session.chain.location))):
+            self.status(f"Cursor on ◉ YOU — {self.session.chain.current().name}.")
+
+    def action_nav_selected(self) -> None:
+        """Detail-panel action link: proceed to the selection."""
+        node = self.query_one(ChainTree).cursor_node
+        if node is not None and node.data is not None:
+            self.query_one(ChainTree).suppress_click_nav = False
+            self.on_tree_node_selected(Tree.NodeSelected(node))
+
+    def action_return_selected(self) -> None:
+        """Detail-panel action link: file selection as the return side."""
+        sel = self._selected_sig()
+        if sel is not None:
+            _path, prefix = sel
+            self._after_engine(self.session.execute(f"return {prefix}"))
 
     def action_sweep(self) -> None:
         self._after_engine(self.session.execute("sweep"))

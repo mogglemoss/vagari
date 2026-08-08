@@ -126,8 +126,25 @@ class DetailPanel(Static):
             self.update(EMPTY_STATE)
             return
         conn = system.find_connection(prefix)
+
+        def link(label: str, action: str, color: str = MUTED) -> str:
+            return f"[{color}][@click=app.{action}]{label}[/][/{color}]"
+
+        actions = []
+        if conn is not None:
+            actions.append(link("nav", "nav_selected", RUST))
+        actions += [
+            link("eol", "sig_cmd('eol')"),
+            link("mass", "sig_cmd('crit')"),
+            link("flag", "sig_cmd('flag')"),
+            link("strike", "sig_cmd('del')"),
+        ]
+        if conn is None:
+            actions.append(link("return", "return_selected"))
+        action_row = f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions)
         lines = [
             f"[bold {RUST}]{sig.prefix}[/bold {RUST}] [{MUTED}]in {system.name}[/{MUTED}]",
+            action_row,
             f"[{TEXT}]{sig.group.value}[/{TEXT}] [{MUTED}]· signal {sig.signal:.1f}%[/{MUTED}]",
         ]
         # The far side of the hole we came through: one wormhole, two sigs.
@@ -165,6 +182,29 @@ class DetailPanel(Static):
             if clouds:
                 contents = " · ".join(f"{c.units:,} × {c.gas}" for c in clouds)
                 lines.append(f"[{TEXT}]{contents}[/{TEXT}]")
+        from vagari.model.chain import SigGroup
+        from vagari.parsers.catalog import candidate_types
+
+        if sig.group is SigGroup.WORMHOLE and (conn is None or not conn.wh_type):
+            candidates = candidate_types(system.name)
+            if candidates:
+                info = lookup_system(system.name)
+                static_codes = set(info.statics) if info else set()
+                lines.append("")
+                lines.append(
+                    f"[{MUTED}]CANDIDATE TYPES for a hole in "
+                    f"{system.name}:[/{MUTED}]"
+                )
+                for t in candidates[:9]:
+                    marker = " static" if t.code in static_codes else ""
+                    life = f" · {t.lifetime_hours:g}h" if t.lifetime_hours else ""
+                    color = TEXT if marker else MUTED
+                    lines.append(
+                        f"  [{color}]{t.code} → {t.target_display}"
+                        f"{life}{marker}[/{color}]"
+                    )
+                if len(candidates) > 9:
+                    lines.append(f"  [{MUTED}]… and {len(candidates) - 9} more[/{MUTED}]")
         if conn is not None:
             lines.append("")
             lines.append(f"[{MUTED}]WORMHOLE — leads to[/{MUTED}] "

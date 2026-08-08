@@ -57,8 +57,16 @@ _HELP_TEXT = """\
   [#7a756e]k-space exits gain sec + region on file
   automatically once named[/#7a756e]
 
+[#3a3530]── the mouse ────────────────────────────[/#3a3530]
+  [#e8e6e3]click selects · double-click proceeds
+  the dossier panel's [bold]nav eol mass flag
+  strike return[/bold] links act on the selection
+  → accepts the typed suggestion[/#e8e6e3]
+
 [#3a3530]── views & custody ──────────────────────[/#3a3530]
-  [bold]1[/bold]/[bold]2[/bold]/[bold]3[/bold]      full / paths / gas
+  [bold]1[/bold]–[bold]5[/bold]      all / paths / sites / gas / combat
+  [bold]y[/bold]        cursor to ◉ YOU
+  [bold]h[/bold] / [bold]home[/bold]   the route home, door by door
   [bold]z[/bold] / [bold]Z[/bold]      undo / redo (unbounded)
   [bold]chain <name>[/bold] switch chain of custody
   [bold]recon[/bold]      refresh system activity (ESI)

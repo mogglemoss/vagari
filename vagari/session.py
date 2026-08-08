@@ -20,7 +20,7 @@ from vagari.parsers.scanner import parse_scan
 _JCODE = re.compile(r"^[Jj]?\d{6}$")
 _PREFIX = re.compile(r"^[A-Za-z]{3}(-\d{3})?$")
 
-VIEWS = ("full", "paths", "gas")
+VIEWS = ("full", "paths", "sites", "gas", "combat")
 
 
 @dataclass
@@ -115,10 +115,12 @@ class Session:
             return self.undo()
         if head == "redo":
             return self.redo()
-        if head in ("top", "home"):
+        if head == "top":
             self.chain.top()
             self._commit(amend=True)
             return f"Relocated to {self.chain.current().name}."
+        if head in ("home", "route"):
+            return self.homeward()
         if head == "up":
             self.chain.up()
             self._commit(amend=True)
@@ -727,6 +729,30 @@ class Session:
         return "Reinstated one revision."
 
     # -- display helpers (UI-agnostic) ---------------------------------------
+
+    def homeward(self) -> str:
+        """The route from ◉ YOU back to the root, door by door — the return
+        sig where one is on file, otherwise the far side of the inbound hole."""
+        loc = self.chain.location
+        if not loc:
+            return f"You are at the top — {self.chain.root.name}. Nowhere is home like home."
+        steps = []
+        for i in range(len(loc), 0, -1):
+            system = self.chain.system_at(loc[:i])
+            parent = self.chain.system_at(loc[: i - 1])
+            conn = parent.find_connection(loc[i - 1])
+            door = (
+                conn.return_prefix
+                if conn is not None and conn.return_prefix
+                else f"far side of {loc[i - 1]}"
+            )
+            steps.append(f"{system.name} ↩ {door}")
+        steps.append(self.chain.root.name)
+        jumps = len(loc)
+        return (
+            f"HOMEWARD ({jumps} jump{'s' if jumps != 1 else ''}): "
+            + " → ".join(steps)
+        )
 
     def breadcrumb(self) -> str:
         names = [self.chain.root.name]

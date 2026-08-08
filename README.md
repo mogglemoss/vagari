@@ -33,7 +33,7 @@ THE BUREAU IS MERELY NOTING.
 
 ## What It Does
 
-**The chain is a tree.** Systems branch through wormholes; every signature is addressed by its three-letter prefix; your position is marked `◉ YOU`. Views filter the record to what matters right now: everything (`1`), wormholes only (`2`), wormholes and gas (`3`). This interaction model is inherited, with respect, from [bashmapper](https://github.com/chloroken/bashmapper) — see Provenance below.
+**The chain is a tree.** Systems branch through wormholes; every signature is addressed by its three-letter prefix; your position is marked `◉ YOU`. Views filter the record to what matters right now: everything (`1`), wormholes (`2`), relic/data/ghost sites (`3`), gas (`4`), combat (`5`) — themed views keep the wormhole skeleton. This interaction model is inherited, with respect, from [bashmapper](https://github.com/chloroken/bashmapper) — see Provenance below.
 
 **Deposits are the only ingestion.** Ctrl+A, Ctrl+C in your probe scanner, paste anywhere in the instrument. New signatures are filed, existing ones are enriched — signal strength only rises, names only improve, your labels always survive. The paste is the source of truth and the Bureau reconciles against it; it does not argue with it.
 
@@ -87,6 +87,8 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 
 ---
 
+**Keyboard and mouse are equals.** Arrows or clicks move the highlight and the dossier panel follows live; a single click only selects — double-click (or Enter) proceeds through a hole. The dossier's `nav · eol · mass · flag · strike · return` links act on whatever is selected, so the panel is a permanently-open context menu. The submission line offers ghost-text completions (type codes, commands, pilot names) — → accepts. `home` prints the route back to the top, door by door, using return-side sigs where they are on file.
+
 ## The Grammar
 
 | Submission | Effect |
@@ -113,7 +115,8 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 |-----|--------|
 | `Enter` | proceed into the selected wormhole |
 | `u` / `g` | up · top |
-| `1` `2` `3` | full · paths · gas views |
+| `1`–`5` | all · paths · sites · gas · combat views |
+| `y` / `h` | cursor to ◉ YOU · route home door by door |
 | `e` `m` `x` `d` | EOL · mass · flag · strike (selected sig) |
 | `k` | file unmapped arrival as K162 |
 | `z` / `Z` | undo · redo |

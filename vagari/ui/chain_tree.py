@@ -36,10 +36,15 @@ def age_text(since: datetime, now: datetime | None = None) -> str:
 
 
 def _visible(sig: Signature, view: str) -> bool:
+    """Themed views keep wormholes so the chain skeleton stays legible."""
     if view == "paths":
         return sig.group is SigGroup.WORMHOLE
+    if view == "sites":
+        return sig.group in (SigGroup.WORMHOLE, SigGroup.RELIC, SigGroup.DATA)
     if view == "gas":
         return sig.group in (SigGroup.WORMHOLE, SigGroup.GAS)
+    if view == "combat":
+        return sig.group in (SigGroup.WORMHOLE, SigGroup.COMBAT)
     return True
 
 
@@ -142,6 +147,29 @@ class ChainTree(Tree):
         self.session = session
         self.show_root = True
         self.guide_depth = 3
+        # Mouse policy: a single click selects (inspection); only a
+        # double-click navigates. Enter always navigates.
+        self.suppress_click_nav = False
+
+    def on_click(self, event) -> None:
+        self.suppress_click_nav = getattr(event, "chain", 1) < 2
+
+    def move_to_data(self, data: tuple) -> bool:
+        def walk(node):
+            if node.data == data:
+                return node
+            for child in node.children:
+                found = walk(child)
+                if found is not None:
+                    return found
+            return None
+
+        node = walk(self.root)
+        if node is not None:
+            self.move_cursor(node)
+            self.scroll_to_node(node)
+            return True
+        return False
 
     def rebuild(self) -> None:
         chain = self.session.chain
@@ -158,18 +186,7 @@ class ChainTree(Tree):
             self._restore_cursor(cursor_data)
 
     def _restore_cursor(self, data: tuple) -> None:
-        def walk(node):
-            if node.data == data:
-                return node
-            for child in node.children:
-                found = walk(child)
-                if found is not None:
-                    return found
-            return None
-
-        node = walk(self.root)
-        if node is not None:
-            self.move_cursor(node)
+        self.move_to_data(data)
 
     def _fill(self, node: TreeNode, system: System, path: list[str],
               via: Connection | None = None, parent_name: str = "") -> None:

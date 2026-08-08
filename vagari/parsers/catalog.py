@@ -39,6 +39,7 @@ class WormholeType:
     code: str                   # "N110", "K162", ...
     target_class: str | None    # raw key: "c3", "hs", None (K162)
     is_static: bool
+    source_classes: tuple[str, ...]   # raw keys that can spawn it, e.g. ("c3",)
     total_mass: int
     jump_mass: int
     lifetime_hours: float
@@ -76,6 +77,7 @@ def load_wormhole_types() -> dict[str, WormholeType]:
             code=t["code"],
             target_class=t["targetClass"],
             is_static=t["isStatic"],
+            source_classes=tuple(t.get("sourceClasses") or []),
             total_mass=t["totalMass"],
             jump_mass=t["jumpMass"],
             lifetime_hours=t["lifetimeHours"],
@@ -147,3 +149,18 @@ def effect_details(effect: str, class_key: str) -> list[tuple[str, str]] | None:
         for attr, values in table.items()
         if index < len(values)
     ]
+
+
+def candidate_types(jcode: str) -> list[WormholeType]:
+    """Plausible outbound types for a J-space system: its statics, then
+    wanderers whose source classes include the system's class."""
+    info = lookup_system(jcode)
+    if info is None:
+        return []
+    types = load_wormhole_types()
+    out = [types[code] for code in info.statics if code in types]
+    class_key = info.jclass.lower()
+    for t in types.values():
+        if t.code not in info.statics and class_key in t.source_classes:
+            out.append(t)
+    return out
