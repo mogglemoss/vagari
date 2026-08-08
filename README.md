@@ -138,15 +138,15 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 
 | Component | Detail |
 |-----------|--------|
-| Chain model | Tree of systems · timestamped signatures · JSON snapshots |
+| Chain model | Forest of fragments · timestamped signatures · JSON snapshots |
 | Undo | Unbounded · one snapshot per mutation · ring of 100 |
 | Scanner parsing | Tab-delimited probe scanner paste · keeps signal % |
 | Reconciliation | Monotonic merge · labels survive · guarded sweeps |
 | J-space catalogue | 2,604 systems · class · statics · weather · shattered |
 | Wormhole types | 90 types · target class · mass · lifetime · size |
-| Lifetime model | Upper bound from first mapping · EOL caps at 4h |
-| Follow-me | UTF-16LE chatlog tail · 1 s poll · rotation-aware |
-| Activity | ESI system kills · one bulk request · fail-silent |
+| Lifetime model | Upper bound from first mapping · EOL clock from marking |
+| Follow-me | UTF-16LE chatlog tail · 1 s poll · multibox-aware · pilot lock |
+| Activity | ESI system kills · one bulk request · fail-silent · watchtower alerts |
 | Network required | Mapping: no · recon: yes |
 | Auth required | None · public endpoints only |
 
