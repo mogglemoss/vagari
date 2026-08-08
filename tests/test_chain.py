@@ -18,13 +18,13 @@ def test_open_and_nav():
 
     system = chain.nav("qlm")
     assert system.name == "J154535"
-    assert chain.location == ["QLM"]
+    assert chain.location == [0, "QLM"]
 
     chain.up()
     assert chain.current() is chain.root
     chain.nav("QLM")
     chain.top()
-    assert chain.location == []
+    assert chain.location == [0]
 
 
 def test_nav_requires_opened_connection():
@@ -86,7 +86,7 @@ def test_roundtrip_serialisation():
 
     restored = Chain.from_dict(chain.to_dict())
     assert restored.name == "test"
-    assert restored.location == ["QLM"]
+    assert restored.location == [0, "QLM"]
     assert restored.current().name == "J154535"
     assert restored.current().effect == "Black Hole"
     assert restored.root.find_sig("FIY").group is SigGroup.RELIC

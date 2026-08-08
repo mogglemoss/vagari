@@ -36,14 +36,14 @@ def test_follow_noop_when_already_there(session):
 def test_follow_into_child(session):
     msg = session.follow("J154535")
     assert "Followed you through QLM" in msg
-    assert session.chain.location == ["QLM"]
+    assert session.chain.location == [0, "QLM"]
 
 
 def test_follow_back_to_parent(session):
     session.follow("J154535")
     msg = session.follow("J105443")
     assert "back up" in msg
-    assert session.chain.location == []
+    assert session.chain.location == [0]
 
 
 def test_follow_finds_system_elsewhere_in_chain(session):
@@ -54,7 +54,7 @@ def test_follow_finds_system_elsewhere_in_chain(session):
     # Pilot appears two jumps deep while the marker sits at the root.
     msg = session.follow("J164417")
     assert "elsewhere in the chain" in msg
-    assert session.chain.location == ["QLM", "ASD"]
+    assert session.chain.location == [0, "QLM", "ASD"]
 
 
 def test_arrival_resolves_single_unknown_hole(tmp_path):
@@ -69,7 +69,7 @@ def test_arrival_resolves_single_unknown_hole(tmp_path):
     assert "J141150" in msg
     assert "verify the type" in msg     # U210 books L; J141150 is C1
     assert sess.pending_arrival is None
-    assert sess.chain.location == ["HUV"]
+    assert sess.chain.location == [0, "HUV"]
     child = sess.chain.root.find_connection("HUV").child
     assert child.name == "J141150"
     assert child.jclass == "C1"         # renamed AND re-enriched
@@ -83,7 +83,7 @@ def test_rekey_merges_duplicate_sibling(tmp_path):
     sess.chain.root.name = "J103529"
     sess.ingest("HUV-843\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t1 AU")
     sess.execute("huv U210")            # HUV → "?"
-    sess.pending_arrival = ("J141150", [])
+    sess.pending_arrival = ("J141150", [0])
     sess.file_k162()                    # the old bug: ZAA → J141150 sibling
     sess.chain.current().sigs.append(Signature(sig_id="INA-123"))
     assert len(sess.chain.root.connections) == 2
@@ -97,7 +97,7 @@ def test_rekey_merges_duplicate_sibling(tmp_path):
     assert conn.child.find_sig("INA") is not None   # subtree survives
     assert conn.wh_type == "U210"                   # typed side wins
     assert root.find_sig("ZAA") is None
-    assert sess.chain.location == ["HUV"]           # path follows the merge
+    assert sess.chain.location == [0, "HUV"]           # path follows the merge
     assert sess.chain.current().name == "J141150"
 
 
@@ -117,7 +117,7 @@ def test_return_is_explicit_never_assumed(tmp_path):
     sess = _mapped_session(tmp_path)
 
     msg = sess.execute("return ina")
-    assert "return side of HUV" in msg and "J103529" in msg
+    assert "far side of HUV" in msg and "J103529" in msg
     inbound = sess.chain.root.find_connection("HUV")
     assert inbound.return_prefix == "INA"
     assert sess.chain.current().connections == []  # no branch opened
@@ -140,7 +140,7 @@ def test_sigs_addressable_from_anywhere(tmp_path):
 
     # Label, eol, and return all reach INA / HUV's child from the root.
     assert "labelled" in sess.execute("ina way home")
-    assert "return side of HUV" in sess.execute("return ina")
+    assert "far side of HUV" in sess.execute("return ina")
     assert "END OF LIFE" in sess.execute("eol huv")
 
     child = sess.chain.root.find_connection("HUV").child
@@ -178,8 +178,8 @@ def test_ambiguous_prefix_needs_qualifier(tmp_path):
 def test_follow_unmapped_offers_k162(session):
     msg = session.follow("J100744")
     assert "UNMAPPED" in msg and "k162" in msg.lower()
-    assert session.pending_arrival == ("J100744", [])
-    assert session.chain.location == []  # marker does not move on speculation
+    assert session.pending_arrival == ("J100744", [0])
+    assert session.chain.location == [0]  # marker does not move on speculation
 
 
 def test_file_k162_creates_placeholder(session):
@@ -189,13 +189,13 @@ def test_file_k162_creates_placeholder(session):
     origin = session.chain.root
     sig = origin.find_sig("ZAA")
     assert sig.group is SigGroup.WORMHOLE
-    assert sig.label == "K162 (unscanned)"
+    assert sig.label == "hole (unscanned)"
     conn = origin.find_connection("ZAA")
-    assert conn.wh_type == "K162"
+    assert conn.wh_type is None  # type unknown: neither end scanned
     assert conn.child.name == "J100744"
     assert conn.child.jclass == "C1"  # enriched from catalog
     assert conn.child.effect == "Cataclysmic Variable"
-    assert session.chain.location == ["ZAA"]
+    assert session.chain.location == [0, "ZAA"]
     assert session.pending_arrival is None
 
 
@@ -323,17 +323,17 @@ async def test_tail_picks_up_new_session_file(tmp_path):
 def test_follow_event_locks_on_first_live_jump(session):
     # Initial positions never move the marker without a lock.
     assert session.follow_event("Trader", "Jita", initial=True) is None
-    assert session.chain.location == []
+    assert session.chain.location == [0]
 
     # First live jump takes the lock.
     msg = session.follow_event("Hunter", "J154535", initial=False)
     assert "FOLLOWING Hunter" in msg
     assert session.pilot_lock == "Hunter"
-    assert session.chain.location == ["QLM"]
+    assert session.chain.location == [0, "QLM"]
 
     # Other pilots' jumps are ignored once locked.
     assert session.follow_event("Trader", "Perimeter", initial=False) is None
-    assert session.chain.location == ["QLM"]
+    assert session.chain.location == [0, "QLM"]
 
 
 def test_pilot_command_reports_and_switches(session):
@@ -355,7 +355,7 @@ def test_pilot_lock_applies_initial_position(session):
     session.pilot_lock = "Hunter"
     msg = session.follow_event("Hunter", "J154535", initial=True)
     assert msg is not None
-    assert session.chain.location == ["QLM"]
+    assert session.chain.location == [0, "QLM"]
 
 
 def test_pilot_lock_survives_restart(tmp_path):

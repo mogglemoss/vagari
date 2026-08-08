@@ -110,7 +110,7 @@ async def test_detail_panel_shows_activity(tmp_path):
     async with app.run_test() as pilot:
         await pilot.pause()
         panel = app.query_one(DetailPanel)
-        panel.show_node(("system", []))
+        panel.show_node(("system", [0]))
         text = str(panel.content)
         assert "ACTIVITY" in text and "3 ship" in text
 
@@ -150,9 +150,9 @@ async def test_follow_me_end_to_end(tmp_path, monkeypatch):
             )
         for _ in range(20):
             await pilot.pause(0.05)
-            if app.session.chain.location == ["QLM"]:
+            if app.session.chain.location == [0, "QLM"]:
                 break
-        assert app.session.chain.location == ["QLM"]
+        assert app.session.chain.location == [0, "QLM"]
         assert "◉ YOU" in tree_text(app.query_one(ChainTree))
 
         # Jump somewhere unmapped, then file it with `k`.
@@ -164,11 +164,11 @@ async def test_follow_me_end_to_end(tmp_path, monkeypatch):
             await pilot.pause(0.05)
             if app.session.pending_arrival is not None:
                 break
-        assert app.session.pending_arrival == ("J100744", ["QLM"])
+        assert app.session.pending_arrival == ("J100744", [0, "QLM"])
 
         await pilot.press("k")
         await pilot.pause()
-        assert app.session.chain.location == ["QLM", "ZAA"]
+        assert app.session.chain.location == [0, "QLM", "ZAA"]
         assert "J100744" in tree_text(app.query_one(ChainTree))
 
 
@@ -201,7 +201,7 @@ async def test_detail_panel_site_intel(tmp_path):
     async with app.run_test() as pilot:
         await paste(app, pilot, "paste_mixed.txt")
         panel = app.query_one(DetailPanel)
-        panel.show_node(("sig", [], "FIY"))  # Ruined Guristas Crystal Quarry
+        panel.show_node(("sig", [0], "FIY"))  # Ruined Guristas Crystal Quarry
         text = str(panel.content)
         assert "NO NPCS" in text and "best containers" in text
 
@@ -282,7 +282,7 @@ async def test_wormhole_type_mass_in_detail(tmp_path):
         await pilot.press("enter")
         await pilot.pause()
         panel = app.query_one(DetailPanel)
-        panel.show_node(("sig", [], "QLM"))
+        panel.show_node(("sig", [0], "QLM"))
         text = str(panel.content)
         assert "N110" in text and "per jump ≤" in text and "total" in text
 
@@ -302,7 +302,7 @@ async def test_search_moves_cursor_and_cycles(tmp_path):
         await pilot.press("enter")
         await pilot.pause()
         tree = app.query_one(ChainTree)
-        assert tree.cursor_node.data == ("system", ["QLM"])
+        assert tree.cursor_node.data == ("system", [0, "QLM"])
         status = str(app.query_one("#status-line", Static).content)
         assert "Match 1/" in status
 
@@ -339,7 +339,7 @@ async def test_kspace_rendering(tmp_path):
 
         app.session.zkill_stats[30000142] = SystemKillStats(1_538_343, 795, 1354)
         panel = app.query_one(DetailPanel)
-        panel.show_node(("system", ["ZAA"]))
+        panel.show_node(("system", [0, "ZAA"]))
         text = str(panel.content)
         assert "security 0.9" in text and "The Forge" in text
         assert "1,538,343 ships destroyed" in text
@@ -358,9 +358,9 @@ async def test_k162_placeholder_detail_does_not_crash(tmp_path):
         app.refresh_all()
         await pilot.pause()
         panel = app.query_one(DetailPanel)
-        panel.show_node(("sig", [], "ZAA"))  # crashed before the fix
+        panel.show_node(("sig", [0], "ZAA"))  # crashed before the fix
         text = str(panel.content)
-        assert "K162" in text and "Vard" in text
+        assert "Vard" in text and "hole (unscanned)" in text
         assert "None" not in text
 
 

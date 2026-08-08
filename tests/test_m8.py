@@ -26,14 +26,14 @@ def session(tmp_path):
 # -- search ------------------------------------------------------------------
 
 def test_find_by_system_name(session):
-    assert ("system", ["QLM"]) in session.find_matches("J1545")
+    assert ("system", [0, "QLM"]) in session.find_matches("J1545")
 
 
 def test_find_by_prefix_name_and_label(session):
     matches = session.find_matches("fiy")
-    assert ("sig", [], "FIY") in matches
-    assert session.find_matches("good relic") == [("sig", [], "FIY")]
-    assert ("sig", [], "FIY") in session.find_matches("crystal quarry")
+    assert ("sig", [0], "FIY") in matches
+    assert session.find_matches("good relic") == [("sig", [0], "FIY")]
+    assert ("sig", [0], "FIY") in session.find_matches("crystal quarry")
 
 
 def test_find_no_match_and_empty(session):

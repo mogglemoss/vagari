@@ -170,7 +170,9 @@ class Session:
         if head == "crit" and rest:
             return self._mass(rest[0], at)
         if head == "return" and rest:
-            return self._set_return(rest[0], at)
+            return self._set_return(
+                rest[0], at, rest[1] if len(rest) > 1 else None
+            )
         if head == "chain" and rest:
             return self._switch_chain(rest[0])
         if head == "pilot":
@@ -186,6 +188,10 @@ class Session:
             return self._rekey(head, rest[1], at)
         if head in ("cull", "cull!"):
             return self._cull(force=head == "cull!")
+        if head == "sever" and rest:
+            return self._sever(rest[0], at)
+        if head == "fragment":
+            return self._fragment(" ".join(rest) if rest else None)
         if _PREFIX.match(head) and rest:
             return self._sig_command(head, rest, at)
         return f"Unrecognised submission: {raw!r}. See `?` for accepted forms."
@@ -198,12 +204,21 @@ class Session:
         ):
             return "Nothing pending a sweep."
         targets = list(self.last_report.despawned)
-        if force:
-            targets += self.last_report.blocked
-        removed = apply_despawn(self.chain.current(), targets, force=force)
+        severed = []
+        here = self.chain.current()
+        here_path = list(self.chain.location)
+        for prefix in list(self.last_report.blocked):
+            # A despawned wormhole with mapped children: the hole collapsed.
+            # Its far side becomes a fragment instead of being destroyed.
+            severed.append(self._sever_conn(here_path, here, prefix))
+        removed = apply_despawn(here, targets, force=force)
         self.last_report = None
         self._commit()
-        return f"Struck from record: {' '.join(removed)}." if removed else "Nothing swept."
+        parts = []
+        if removed:
+            parts.append(f"Struck from record: {' '.join(removed)}.")
+        parts.extend(severed)
+        return " ".join(parts) if parts else "Nothing swept."
 
     def _locate(self, prefix: str, at: str | None = None):
         """Resolve a signature prefix anywhere in the chain.
@@ -221,7 +236,8 @@ class Session:
             for conn in system.connections:
                 walk(path + [conn.sig_prefix], conn.child)
 
-        walk([], self.chain.root)
+        for ri, root in enumerate(self.chain.roots):
+            walk([ri], root)
         if at is not None:
             matches = [m for m in matches if m[1].name.lower() == at.lower()]
             if not matches:
@@ -262,22 +278,121 @@ class Session:
         self._commit()
         return f"{conn.sig_prefix} ({system.name}) mass: {conn.mass.value.upper()}."
 
-    def _set_return(self, prefix: str, at: str | None = None) -> str:
+    def _set_return(self, prefix: str, at: str | None = None,
+                    code: str | None = None) -> str:
         """Explicitly pair a signature with the hole its system was entered
-        through — never assumed, always stated."""
+        through — never assumed, always stated. An optional type code read
+        on this side (`return ina B274`) types the whole connection: the
+        true type lives wherever it was read; the other end wears K162."""
         path, system, sig = self._locate(prefix, at)
-        if not path:
+        if len(path) <= 1:
             raise ChainError(
-                f"{system.name} is the root — no inbound hole to return through"
+                f"{system.name} is a fragment root — no inbound hole to return through"
             )
         parent = self.chain.system_at(path[:-1])
         inbound = parent.find_connection(path[-1])
         sig.group = SigGroup.WORMHOLE
         inbound.return_prefix = sig.prefix
+        typed = ""
+        if code is not None:
+            wh_type = lookup_wh_type(code)
+            if wh_type is None or code.upper() == "K162":
+                if code.upper() == "K162":
+                    inbound.k162_end = "child"
+                    typed = " Its K162 end is on this side."
+                else:
+                    raise ChainError(f"{code!r} is not a wormhole type")
+            else:
+                inbound.wh_type = wh_type.code
+                inbound.k162_end = "parent"
+                typed = (
+                    f" True type {wh_type.code} read from this side — "
+                    f"{parent.name}'s end is the K162."
+                )
         self._commit()
         return (
-            f"{sig.prefix} filed as the return side of {inbound.sig_prefix} "
-            f"— home to {parent.name}."
+            f"{sig.prefix} filed as the far side of {inbound.sig_prefix} "
+            f"— paired with {parent.name}.{typed}"
+        )
+
+    def _sever_conn(self, path: list, system: System, prefix: str) -> str:
+        """Core of a sever: detach the connection at `prefix` in `system`
+        (located at `path`) into a free-floating fragment."""
+        sig = self._require_prefix(system, prefix)
+        conn = system.find_connection(sig.prefix)
+        if conn is None:
+            raise ChainError(f"{sig.prefix} is not an opened wormhole")
+        child = conn.child
+        system.connections.remove(conn)
+        system.sigs.remove(sig)
+        self.chain.roots.append(child)
+        new_ri = len(self.chain.roots) - 1
+        inside = path + [sig.prefix]
+        if self.chain.location[: len(inside)] == inside:
+            # We were behind the collapse: our position moves to the fragment.
+            self.chain.location = [new_ri] + self.chain.location[len(inside):]
+        return (
+            f"{sig.prefix} severed — {child.name} and everything behind it "
+            f"is now fragment #{new_ri + 1}, adrift but on file."
+        )
+
+    def _sever(self, prefix: str, at: str | None = None) -> str:
+        """Strike a dead hole but keep everything behind it as a free-floating
+        fragment — the routine outcome of a mid-chain collapse."""
+        path, system, _sig = self._locate(prefix, at)
+        message = self._sever_conn(path, system, prefix)
+        self._commit()
+        return message
+
+    def _fragment(self, arg: str | None) -> str:
+        """File a new free-floating fragment: from a pending arrival, or by
+        name (`fragment J123456` / `fragment Staging`)."""
+        if arg:
+            name = arg.upper() if _JCODE.match(arg) else arg
+            if _JCODE.match(arg) and not name.startswith("J"):
+                name = "J" + name
+        elif self.pending_arrival is not None:
+            name = self.pending_arrival[0]
+        else:
+            return (
+                "Nothing to file: name it (`fragment J123456`) or arrive "
+                "somewhere unmapped first."
+            )
+        system = System(name=name)
+        info = lookup_system(name)
+        if info is not None:
+            system.jclass = info.jclass
+            system.statics = info.static_display
+            system.effect = info.effect
+        self.chain.roots.append(system)
+        self.chain.location = [len(self.chain.roots) - 1]
+        self.pending_arrival = None
+        self._commit()
+        return f"{name} filed as fragment #{len(self.chain.roots)} — ◉ YOU placed there."
+
+    def _adopt_fragment(self, system: System, path: list, prefix: str,
+                        frag_ri: int) -> str:
+        """Reattach a fragment as the destination of an opened signature."""
+        if frag_ri == path[0]:
+            raise ChainError(
+                "that fragment contains this very system — adoption would "
+                "close a loop the Bureau cannot file"
+            )
+        sig = self._require_prefix(system, prefix)
+        fragment = self.chain.roots[frag_ri]
+        sig.group = SigGroup.WORMHOLE
+        conn = Connection(sig_prefix=sig.prefix, child=fragment)
+        system.connections.append(conn)
+        self.chain.roots.pop(frag_ri)
+        loc = self.chain.location
+        if loc[0] == frag_ri:
+            self.chain.location = path + [sig.prefix] + loc[1:]
+        elif loc[0] > frag_ri:
+            self.chain.location = [loc[0] - 1] + loc[1:]
+        self._commit()
+        return (
+            f"{sig.prefix} ({system.name}) → {fragment.name} — fragment "
+            "reattached; the record is whole again."
         )
 
     def _switch_chain(self, name: str) -> str:
@@ -314,7 +429,14 @@ class Session:
 
     def _open_jcode(self, prefix: str, jcode: str, at: str | None = None) -> str:
         info = lookup_system(jcode)
-        _, system, _sig = self._locate(prefix, at)
+        path, system, _sig = self._locate(prefix, at)
+        dest = info.jcode if info is not None else (
+            jcode.upper() if jcode.upper().startswith("J") else f"J{jcode}"
+        )
+        if system.find_connection(prefix) is None:
+            for ri, root in enumerate(self.chain.roots):
+                if root.name.upper() == dest.upper():
+                    return self._adopt_fragment(system, path, prefix, ri)
         if info is not None:
             conn = self._open_at(
                 system, prefix, info.jcode, jclass=info.jclass,
@@ -341,6 +463,19 @@ class Session:
         wh_type = lookup_wh_type(code)
         _, system, _sig = self._locate(prefix, at)
         conn = system.find_connection(prefix)
+        if code == "K162":
+            # K162 is an end, not a type: this sig is the far side of a hole
+            # someone opened INTO this system. Its true type is unknown until
+            # read from the other side.
+            if conn is None:
+                conn = self._open_at(system, prefix, "?")
+            conn.k162_end = "parent"
+            conn.wh_type = None
+            self._commit()
+            return (
+                f"{conn.sig_prefix} ({system.name}) is a K162 — opened from "
+                "the far side; type reads over there."
+            )
         if conn is None:
             conn = self._open_at(
                 system, prefix, "?",
@@ -349,6 +484,7 @@ class Session:
             )
         else:
             conn.wh_type = code
+        conn.k162_end = "child"  # true type read here ⇒ far side wears K162
         self._commit()
         life = f", {wh_type.lifetime_hours:g}h" if wh_type.lifetime_hours else ""
         return (
@@ -413,8 +549,8 @@ class Session:
             return None
 
         # Fresh chain: first observed system names the root.
-        if chain.root.name == "HOME" and not chain.root.connections:
-            return self._name_system(chain.root, name)
+        if chain.roots[0].name == "HOME" and not chain.roots[0].connections:
+            return self._name_system(chain.roots[0], name)
 
         for conn in current.connections:
             if conn.child.name == name:
@@ -423,7 +559,7 @@ class Session:
                 self._commit(amend=True)
                 return f"Followed you through {conn.sig_prefix} to {name}."
 
-        if chain.location:
+        if len(chain.location) > 1:
             parent = chain.system_at(chain.location[:-1])
             if parent.name == name:
                 chain.location.pop()
@@ -478,7 +614,7 @@ class Session:
         prefix = self._placeholder_prefix(origin)
         origin.sigs.append(
             Signature(sig_id=f"{prefix}-000", group=SigGroup.WORMHOLE,
-                      label="K162 (unscanned)")
+                      label="hole (unscanned)")
         )
         info = lookup_system(name)
         saved_location = self.chain.location
@@ -489,7 +625,7 @@ class Session:
                 jclass=info.jclass if info else None,
                 statics=info.static_display if info else None,
                 effect=info.effect if info else None,
-                wh_type="K162",
+                wh_type=None,
             )
         except ChainError:
             self.chain.location = saved_location
@@ -498,8 +634,8 @@ class Session:
         self.pending_arrival = None
         self._commit()
         return (
-            f"Filed {name} as K162 via placeholder {prefix} — relabel it when "
-            "you scan the real signature."
+            f"Filed {name} via placeholder {prefix} — refile (`{prefix.lower()} "
+            "= abc`) when you scan the real signature."
         )
 
     def find_matches(self, query: str) -> list[tuple]:
@@ -509,7 +645,9 @@ class Session:
         if not q:
             return []
         matches: list[tuple] = []
-        queue: list[tuple[list[str], object]] = [([], self.chain.root)]
+        queue: list[tuple[list, object]] = [
+            ([ri], root) for ri, root in enumerate(self.chain.roots)
+        ]
         while queue:
             path, system = queue.pop(0)
             if q in system.name.lower():
@@ -526,7 +664,7 @@ class Session:
         """Chain system names that are neither catalogued J-space nor
         already resolved — candidates for ESI k-space lookup."""
         names: list[str] = []
-        queue = [self.chain.root]
+        queue = list(self.chain.roots)
         while queue:
             system = queue.pop(0)
             name = system.name
@@ -542,7 +680,9 @@ class Session:
 
     def _find_system(self, name: str) -> list[str] | None:
         """Breadth-first search for a system by name; returns its path."""
-        queue: list[tuple[list[str], object]] = [([], self.chain.root)]
+        queue: list[tuple[list, object]] = [
+            ([ri], root) for ri, root in enumerate(self.chain.roots)
+        ]
         while queue:
             path, system = queue.pop(0)
             if system.name == name:
@@ -614,7 +754,7 @@ class Session:
                 )
             here.sigs.remove(sig)
             target.group = SigGroup.WORMHOLE
-            if sig.label and sig.label != "K162 (unscanned)":
+            if sig.label and sig.label not in ("K162 (unscanned)", "hole (unscanned)"):
                 target.label = target.label or sig.label
             message = (
                 f"{old_prefix} absorbed into {new_prefix} — the placeholder "
@@ -622,7 +762,7 @@ class Session:
             )
         else:
             sig.sig_id = f"{new_prefix}-000"
-            if sig.label == "K162 (unscanned)":
+            if sig.label in ("K162 (unscanned)", "hole (unscanned)"):
                 sig.label = ""
             message = f"{old_prefix} refiled as {new_prefix}. The record forgives."
 
@@ -654,21 +794,20 @@ class Session:
         if not expired:
             return "Nothing past its book lifetime here."
         removed, blocked = [], []
+        here_path = list(self.chain.location)
         for prefix in expired:
             try:
                 here.remove_sig(prefix, force=force)
                 removed.append(prefix)
             except ChainError:
-                blocked.append(prefix)
-        if removed:
+                blocked.append(self._sever_conn(here_path, here, prefix))
+        if removed or blocked:
             self._commit()
         parts = []
         if removed:
             parts.append(f"Culled: {' '.join(removed)}.")
         if blocked:
-            parts.append(
-                f"Retained (mapped children): {' '.join(blocked)} — `cull!` to force."
-            )
+            parts.extend(blocked)
         return " ".join(parts)
 
     # -- activity history (auto-recon sampling) ------------------------------
@@ -734,10 +873,11 @@ class Session:
         """The route from ◉ YOU back to the root, door by door — the return
         sig where one is on file, otherwise the far side of the inbound hole."""
         loc = self.chain.location
-        if not loc:
-            return f"You are at the top — {self.chain.root.name}. Nowhere is home like home."
+        if len(loc) <= 1:
+            here = self.chain.current().name
+            return f"You are at the top of this fragment — {here}."
         steps = []
-        for i in range(len(loc), 0, -1):
+        for i in range(len(loc), 1, -1):
             system = self.chain.system_at(loc[:i])
             parent = self.chain.system_at(loc[: i - 1])
             conn = parent.find_connection(loc[i - 1])
@@ -747,17 +887,17 @@ class Session:
                 else f"far side of {loc[i - 1]}"
             )
             steps.append(f"{system.name} ↩ {door}")
-        steps.append(self.chain.root.name)
-        jumps = len(loc)
+        steps.append(self.chain.system_at([loc[0]]).name)
+        jumps = len(loc) - 1
         return (
             f"HOMEWARD ({jumps} jump{'s' if jumps != 1 else ''}): "
             + " → ".join(steps)
         )
 
     def breadcrumb(self) -> str:
-        names = [self.chain.root.name]
-        system = self.chain.root
-        for prefix in self.chain.location:
+        system = self.chain.system_at([self.chain.location[0]])
+        names = [system.name]
+        for prefix in self.chain.location[1:]:
             system = system.find_connection(prefix).child
             names.append(system.name)
         return " ▸ ".join(names)

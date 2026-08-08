@@ -88,9 +88,15 @@ class Connection:
 
     sig_prefix: str
     child: System
-    wh_type: str | None = None      # "K162", "H296", ...
-    # The far side's sig prefix in the CHILD system — the return hole
-    # (usually the K162). Pairs the two halves of one wormhole.
+    # The hole's TRUE type ("H296", "U210", …) whichever side it was read
+    # from. K162 is not a type but an end: `k162_end` records which end
+    # wears it — "parent" (someone opened into the parent; entering it is
+    # forward travel), "child" (the parent side was opened first), or None
+    # (not yet established).
+    wh_type: str | None = None
+    k162_end: str | None = None
+    # The far side's sig prefix in the CHILD system. Pairs the two halves
+    # of one wormhole; direction-neutral.
     return_prefix: str | None = None
     eol: bool = False
     mass: MassState = MassState.FRESH
@@ -101,6 +107,7 @@ class Connection:
             "sig_prefix": self.sig_prefix,
             "child": self.child.to_dict(),
             "wh_type": self.wh_type,
+            "k162_end": self.k162_end,
             "return_prefix": self.return_prefix,
             "eol": self.eol,
             "mass": self.mass.value,
@@ -112,7 +119,12 @@ class Connection:
         return cls(
             sig_prefix=d["sig_prefix"],
             child=System.from_dict(d["child"]),
-            wh_type=d["wh_type"],
+            # Legacy records used wh_type="K162" to mean "the parent-side
+            # sig is a K162"; the true type was unknown.
+            wh_type=None if d["wh_type"] == "K162" else d["wh_type"],
+            k162_end=d.get(
+                "k162_end", "parent" if d["wh_type"] == "K162" else None
+            ),
             return_prefix=d.get("return_prefix"),
             eol=d["eol"],
             mass=MassState(d["mass"]),
@@ -188,18 +200,33 @@ class System:
 
 @dataclass
 class Chain:
+    """A forest of mapped fragments. Paths are [fragment_index, *sig_prefixes];
+    the location's first element names the fragment ◉ YOU is in."""
+
     name: str = "home"
-    root: System = field(default_factory=lambda: System(name="HOME"))
-    location: list[str] = field(default_factory=list)  # sig prefixes from root
+    roots: list[System] = field(default_factory=lambda: [System(name="HOME")])
+    location: list = field(default_factory=lambda: [0])
+
+    @property
+    def root(self) -> System:
+        """The first fragment — the traditional single-tree view."""
+        return self.roots[0]
 
     # -- navigation ----------------------------------------------------------
 
-    def system_at(self, path: list[str]) -> System:
-        system = self.root
-        for prefix in path:
+    def system_at(self, path: list) -> System:
+        if not path or not isinstance(path[0], int):
+            raise ChainError(f"malformed path {path!r} (no fragment index)")
+        try:
+            system = self.roots[path[0]]
+        except IndexError:
+            raise ChainError(f"no fragment #{path[0]} on this chain") from None
+        for prefix in path[1:]:
             conn = system.find_connection(prefix)
             if conn is None:
-                raise ChainError(f"no opened wormhole {norm_prefix(prefix)!r} in {system.name}")
+                raise ChainError(
+                    f"no opened wormhole {norm_prefix(prefix)!r} in {system.name}"
+                )
             system = conn.child
         return system
 
@@ -215,13 +242,14 @@ class Chain:
         return self.current()
 
     def up(self) -> System:
-        if self.location:
+        if len(self.location) > 1:
             self.location.pop()
         return self.current()
 
     def top(self) -> System:
-        self.location = []
-        return self.root
+        """To the root of the CURRENT fragment."""
+        self.location = [self.location[0]]
+        return self.current()
 
     # -- sig operations (all act on the current system) ----------------------
 
@@ -270,14 +298,20 @@ class Chain:
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "root": self.root.to_dict(),
+            "roots": [r.to_dict() for r in self.roots],
             "location": list(self.location),
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Chain:
+        if "root" in d:  # legacy single-tree snapshot
+            return cls(
+                name=d["name"],
+                roots=[System.from_dict(d["root"])],
+                location=[0] + list(d["location"]),
+            )
         return cls(
             name=d["name"],
-            root=System.from_dict(d["root"]),
+            roots=[System.from_dict(r) for r in d["roots"]],
             location=list(d["location"]),
         )

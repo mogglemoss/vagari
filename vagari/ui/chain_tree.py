@@ -111,7 +111,9 @@ def sig_label(sig: Signature, conn: Connection | None,
         text += f" [{FADED}]({age_text(sig.last_seen, now)} unconfirmed)[/{FADED}]"
     if conn is not None:
         badges = []
-        if conn.wh_type:
+        if conn.k162_end == "parent":
+            badges.append("K162" + (f"({conn.wh_type})" if conn.wh_type else ""))
+        elif conn.wh_type:
             badges.append(conn.wh_type)
         life = assess(conn)
         if life.remaining_hours is not None:
@@ -145,7 +147,7 @@ class ChainTree(Tree):
     def __init__(self, session: Session, **kwargs) -> None:
         super().__init__("root", **kwargs)
         self.session = session
-        self.show_root = True
+        self.show_root = False  # the tree root is the chain; fragments are top-level
         self.guide_depth = 3
         # Mouse policy: a single click selects (inspection); only a
         # double-click navigates. Enter always navigates.
@@ -175,12 +177,17 @@ class ChainTree(Tree):
         chain = self.session.chain
         cursor_data = self.cursor_node.data if self.cursor_node else None
         self.clear()
-        self.root.set_label(
-            system_label(chain.root, here=chain.location == [],
-                         kinfo=self.session.kspace.get(chain.root.name))
-        )
-        self.root.data = ("system", [])
-        self._fill(self.root, chain.root, [])
+        self.root.set_label(f"[{MUTED}]chain {chain.name}[/{MUTED}]")
+        self.root.data = None
+        for ri, fragment in enumerate(chain.roots):
+            adrift = f" [{DIM}]· adrift[/{DIM}]" if ri > 0 else ""
+            node = self.root.add(
+                system_label(fragment, here=chain.location == [ri],
+                             kinfo=self.session.kspace.get(fragment.name))
+                + adrift,
+                data=("system", [ri]),
+            )
+            self._fill(node, fragment, [ri])
         self.root.expand_all()
         if cursor_data is not None:
             self._restore_cursor(cursor_data)

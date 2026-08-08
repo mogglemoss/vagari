@@ -43,7 +43,13 @@ _HELP_TEXT = """\
   [bold]eol abc[/bold] / [bold]e[/bold]  toggle end-of-life
   [bold]crit abc[/bold] / [bold]m[/bold] cycle mass state
   [bold]zaa = abc[/bold]  refile a placeholder's real sig
+  [bold]return ina B274[/bold] optional type read on the
+             far side; other end wears K162
+  [bold]sever abc[/bold]  collapsed hole → far side becomes
+             an adrift fragment (kept, not lost)
+  [bold]fragment [name][/bold] file an unattached fragment
   [bold]cull[/bold]       strike holes past book lifetime
+             (mapped children sever, not vanish)
   [bold]c[/bold] / [bold]copy[/bold]   chain as text to clipboard
 
 [#3a3530]── the legend ───────────────────────────[/#3a3530]

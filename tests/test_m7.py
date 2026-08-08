@@ -70,10 +70,10 @@ def test_rekey_from_inside_the_hole(session):
     the rename."""
     session.follow("J100744")
     session.file_k162()                      # ZAA → J100744, we are inside
-    assert session.chain.location == ["ZAA"]
+    assert session.chain.location == [0, "ZAA"]
     msg = session.execute("zaa = kdx")       # no `up` required
     assert "refiled as KDX" in msg
-    assert session.chain.location == ["KDX"]
+    assert session.chain.location == [0, "KDX"]
     assert session.chain.current().name == "J100744"  # path still resolves
     parent = session.chain.root
     assert parent.find_connection("KDX").child.name == "J100744"
@@ -98,7 +98,7 @@ def test_rekey_absorbs_scanned_real_sig(session):
     assert kdx.signal == 100.0
     conn = here.find_connection("KDX")
     assert conn is not None and conn.child.name == "J100744"
-    assert conn.wh_type == "K162"
+    assert conn.wh_type is None  # placeholder holes carry no type
 
 
 # -- cull --------------------------------------------------------------------
@@ -113,7 +113,7 @@ def test_cull_strikes_expired(session):
     assert session.chain.current().find_sig("QLM") is None
 
 
-def test_cull_guards_children(session):
+def test_cull_severs_children_into_fragment(session):
     conn = session.chain.current().find_connection("QLM")
     conn.wh_type = "N110"
     conn.opened_at = utcnow() - timedelta(hours=30)
@@ -121,9 +121,13 @@ def test_cull_guards_children(session):
     session.ingest((FIXTURES / "paste_second.txt").read_text())
     session.execute("top")
     msg = session.execute("cull")
-    assert "Retained" in msg
-    assert session.chain.current().find_sig("QLM") is not None
-    assert "Culled: QLM" in session.execute("cull!")
+    # An expired hole with mapped children is not destroyed and not
+    # retained — its far side becomes a free-floating fragment.
+    assert "severed" in msg and "fragment #2" in msg
+    assert session.chain.current().find_sig("QLM") is None
+    assert len(session.chain.roots) == 2
+    assert session.chain.roots[1].name == "J154535"
+    assert session.chain.roots[1].find_sig("ZZT") is not None  # subtree intact
 
 
 def test_cull_nothing(session):

@@ -148,7 +148,7 @@ class DetailPanel(Static):
             f"[{TEXT}]{sig.group.value}[/{TEXT}] [{MUTED}]· signal {sig.signal:.1f}%[/{MUTED}]",
         ]
         # The far side of the hole we came through: one wormhole, two sigs.
-        if path:
+        if len(path) > 1:
             parent = self.session.chain.system_at(path[:-1])
             via = parent.find_connection(path[-1])
             if via is not None and via.return_prefix == sig.prefix:

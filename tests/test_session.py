@@ -124,8 +124,8 @@ def test_chain_switch(session):
 
 def test_jump(session):
     session.execute("qlm J154535")
-    assert "J154535" in session.jump(["QLM"])
-    assert session.chain.location == ["QLM"]
+    assert "J154535" in session.jump([0, "QLM"])
+    assert session.chain.location == [0, "QLM"]
 
 
 def test_unknown_command(session):

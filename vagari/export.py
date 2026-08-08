@@ -26,7 +26,9 @@ def _sig_line(system: System, sig: Signature) -> str:
         parts.append(f"({sig.signal:.0f}%)")
     if conn is not None:
         badges = []
-        if conn.wh_type:
+        if conn.k162_end == "parent":
+            badges.append("K162" + (f"({conn.wh_type})" if conn.wh_type else ""))
+        elif conn.wh_type:
             badges.append(conn.wh_type)
         life = assess(conn)
         if life.remaining_hours is not None:
@@ -84,8 +86,12 @@ def export_text(chain: Chain, view: str = "full") -> str:
                 )
                 walk(conn.child, child_path, prefix + carry + "   ")
 
-    lines.append(_system_line(chain.root, here=chain.location == []))
-    walk(chain.root, [], "")
+    for ri, fragment in enumerate(chain.roots):
+        if ri > 0:
+            lines.append("")
+            lines.append(f"— fragment #{ri + 1}, adrift —")
+        lines.append(_system_line(fragment, here=chain.location == [ri]))
+        walk(fragment, [ri], "")
     lines.append("")
     lines.append(f"— VAGARI · chain {chain.name} · Anoikis Cartographic Bureau")
     return "\n".join(lines)

@@ -22,16 +22,16 @@ async def test_single_click_selects_double_click_navigates(tmp_path):
 
         # Simulate a single click on the wormhole node: select only.
         tree.suppress_click_nav = True
-        node = tree.root.children[-1]  # QLM sig node
+        node = tree.root.children[0].children[-1]  # QLM sig node
         tree.move_cursor(node)
         app.on_tree_node_selected(Tree.NodeSelected(node))
         await pilot.pause()
-        assert app.session.chain.location == []  # did NOT navigate
+        assert app.session.chain.location == [0]  # did NOT navigate
 
         # Enter (no click flag) navigates.
         app.on_tree_node_selected(Tree.NodeSelected(node))
         await pilot.pause()
-        assert app.session.chain.location == ["QLM"]
+        assert app.session.chain.location == [0, "QLM"]
 
 
 @pytest.mark.asyncio
@@ -40,11 +40,11 @@ async def test_snap_to_you(tmp_path):
     async with app.run_test() as pilot:
         await paste(app, pilot, "paste_mixed.txt")
         tree = app.query_one(ChainTree)
-        tree.move_cursor(tree.root.children[0])  # wander off
-        assert tree.cursor_node.data != ("system", [])
+        tree.move_cursor(tree.root.children[0].children[0])  # wander off
+        assert tree.cursor_node.data != ("system", [0])
         await pilot.press("y")
         await pilot.pause()
-        assert tree.cursor_node.data == ("system", [])
+        assert tree.cursor_node.data == ("system", [0])
 
 
 @pytest.mark.asyncio
@@ -53,7 +53,7 @@ async def test_action_row_present_and_working(tmp_path):
     async with app.run_test() as pilot:
         await paste(app, pilot, "paste_mixed.txt")
         panel = app.query_one(DetailPanel)
-        panel.show_node(("sig", [], "FIY"))
+        panel.show_node(("sig", [0], "FIY"))
         text = str(panel.content)
         assert "@click=app.sig_cmd('eol')" in text
         assert "strike" in text and "flag" in text
@@ -62,8 +62,8 @@ async def test_action_row_present_and_working(tmp_path):
 
         # The linked action operates on the tree selection.
         tree = app.query_one(ChainTree)
-        for node in tree.root.children:
-            if node.data == ("sig", [], "FIY"):
+        for node in tree.root.children[0].children:
+            if node.data == ("sig", [0], "FIY"):
                 tree.move_cursor(node)
         app.action_sig_cmd("flag")
         await pilot.pause()
@@ -90,7 +90,7 @@ async def test_candidate_types_for_untyped_hole(tmp_path):
     async with app.run_test() as pilot:
         await paste(app, pilot, "paste_mixed.txt")
         panel = app.query_one(DetailPanel)
-        panel.show_node(("sig", [], "QLM"))  # wormhole, never typed
+        panel.show_node(("sig", [0], "QLM"))  # wormhole, never typed
         text = str(panel.content)
         assert "CANDIDATE TYPES" in text
         assert "static" in text  # the system's static is marked
