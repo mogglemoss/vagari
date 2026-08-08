@@ -236,10 +236,34 @@ class Session:
         self._commit()
         return f"{conn.sig_prefix} → {name} [not in Bureau records]."
 
+    def _require_prefix(self, system, prefix: str) -> Signature:
+        sig = system.find_sig(prefix)
+        if sig is None:
+            raise ChainError(f"no signature {prefix.upper()[:3]!r} in {system.name}")
+        return sig
+
     def _set_wh_type(self, prefix: str, code: str) -> str:
         wh_type = lookup_wh_type(code)
         here = self.chain.current()
         conn = here.find_connection(prefix)
+        # A K162 typed inside a mapped system is the way home: pair it with
+        # the connection we came through instead of opening a new branch.
+        if (
+            conn is None
+            and wh_type.code == "K162"
+            and self.chain.location
+        ):
+            parent = self.chain.system_at(self.chain.location[:-1])
+            inbound = parent.find_connection(self.chain.location[-1])
+            if inbound is not None and inbound.return_prefix is None:
+                sig = self._require_prefix(here, prefix)
+                sig.group = SigGroup.WORMHOLE
+                inbound.return_prefix = sig.prefix
+                self._commit()
+                return (
+                    f"{sig.prefix} filed as the return side of "
+                    f"{inbound.sig_prefix} — home to {parent.name}."
+                )
         if conn is None:
             conn = self.chain.open_connection(prefix, "?", jclass=wh_type.target_display
                                               if wh_type.target_class else None,

@@ -89,6 +89,9 @@ class Connection:
     sig_prefix: str
     child: System
     wh_type: str | None = None      # "K162", "H296", ...
+    # The far side's sig prefix in the CHILD system — the return hole
+    # (usually the K162). Pairs the two halves of one wormhole.
+    return_prefix: str | None = None
     eol: bool = False
     mass: MassState = MassState.FRESH
     opened_at: datetime = field(default_factory=utcnow)
@@ -98,6 +101,7 @@ class Connection:
             "sig_prefix": self.sig_prefix,
             "child": self.child.to_dict(),
             "wh_type": self.wh_type,
+            "return_prefix": self.return_prefix,
             "eol": self.eol,
             "mass": self.mass.value,
             "opened_at": self.opened_at.isoformat(),
@@ -109,6 +113,7 @@ class Connection:
             sig_prefix=d["sig_prefix"],
             child=System.from_dict(d["child"]),
             wh_type=d["wh_type"],
+            return_prefix=d.get("return_prefix"),
             eol=d["eol"],
             mass=MassState(d["mass"]),
             opened_at=datetime.fromisoformat(d["opened_at"]),

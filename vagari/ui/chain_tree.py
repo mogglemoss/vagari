@@ -61,6 +61,16 @@ def system_label(system: System, here: bool, kinfo=None) -> str:
     return "  ".join(parts)
 
 
+def return_label(sig: Signature, parent_name: str) -> str:
+    """The far side of the hole we came through — the way home."""
+    kind_cell = f"[{RUST}]{'RETURN':<{KIND_WIDTH}}[/{RUST}]"
+    return (
+        f"[{RUST}]○[/{RUST}] {kind_cell} [{TEXT}]{sig.prefix}[/{TEXT}] "
+        f"[{MUTED}]{sig.label or sig.name or 'K162'}[/{MUTED}]  "
+        f"[{RUST}]↩ {parent_name}[/{RUST}]"
+    )
+
+
 def sig_label(sig: Signature, conn: Connection | None,
               now: datetime | None = None) -> str:
     now = now or utcnow()
@@ -161,12 +171,18 @@ class ChainTree(Tree):
         if node is not None:
             self.move_cursor(node)
 
-    def _fill(self, node: TreeNode, system: System, path: list[str]) -> None:
+    def _fill(self, node: TreeNode, system: System, path: list[str],
+              via: Connection | None = None, parent_name: str = "") -> None:
         chain = self.session.chain
         for sig in system.sigs:
             conn = system.find_connection(sig.prefix)
             if conn is None:
-                if _visible(sig, self.session.view):
+                if via is not None and sig.prefix == via.return_prefix:
+                    node.add_leaf(
+                        return_label(sig, parent_name),
+                        data=("sig", path, sig.prefix),
+                    )
+                elif _visible(sig, self.session.view):
                     node.add_leaf(sig_label(sig, None), data=("sig", path, sig.prefix))
                 continue
             sig_node = node.add(sig_label(sig, conn), data=("sig", path, sig.prefix))
@@ -176,4 +192,5 @@ class ChainTree(Tree):
                              kinfo=self.session.kspace.get(conn.child.name)),
                 data=("system", child_path),
             )
-            self._fill(child_node, conn.child, child_path)
+            self._fill(child_node, conn.child, child_path,
+                       via=conn, parent_name=system.name)

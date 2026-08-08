@@ -130,6 +130,17 @@ class DetailPanel(Static):
             f"[bold {RUST}]{sig.prefix}[/bold {RUST}] [{MUTED}]in {system.name}[/{MUTED}]",
             f"[{TEXT}]{sig.group.value}[/{TEXT}] [{MUTED}]· signal {sig.signal:.1f}%[/{MUTED}]",
         ]
+        # The far side of the hole we came through: one wormhole, two sigs.
+        if path:
+            parent = self.session.chain.system_at(path[:-1])
+            via = parent.find_connection(path[-1])
+            if via is not None and via.return_prefix == sig.prefix:
+                pair = f"{via.wh_type} " if via.wh_type else ""
+                lines.append(
+                    f"[bold {RUST}]RETURN[/bold {RUST}] [{MUTED}]— the far side "
+                    f"of {pair}{via.sig_prefix} in {parent.name}. One hole, "
+                    f"two signatures; its clock and mass are shared.[/{MUTED}]"
+                )
         if sig.name:
             lines.append(f"[{TEXT}]{sig.name}[/{TEXT}]")
         if sig.label:

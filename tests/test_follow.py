@@ -101,6 +101,31 @@ def test_rekey_merges_duplicate_sibling(tmp_path):
     assert sess.chain.current().name == "J141150"
 
 
+def test_k162_typed_inside_pairs_with_inbound(tmp_path):
+    """`ina K162` while inside pairs INA with the hole we came through
+    instead of opening a new branch — one wormhole, two signatures."""
+    sess = Session.open(Store(base_dir=tmp_path / "state"))
+    sess.chain.root.name = "J103529"
+    sess.ingest("HUV-843\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t1 AU")
+    sess.execute("huv U210")
+    sess.follow("J141150")              # resolves the "?" and moves inside
+    sess.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
+
+    msg = sess.execute("ina K162")
+    assert "return side of HUV" in msg and "J103529" in msg
+    inbound = sess.chain.root.find_connection("HUV")
+    assert inbound.return_prefix == "INA"
+    # No new branch was opened in J141150.
+    assert sess.chain.current().connections == []
+    # A SECOND K162 typed here is a different hole — a normal open.
+    sess.ingest("QQQ-001\tCosmic Signature\tWormhole\t\t8.0%\t1 AU")
+    sess.execute("qqq K162")
+    assert sess.chain.current().find_connection("QQQ") is not None
+    # Round-trips through the store.
+    reloaded = Store(base_dir=tmp_path / "state").load_latest("home")
+    assert reloaded.root.find_connection("HUV").return_prefix == "INA"
+
+
 def test_follow_unmapped_offers_k162(session):
     msg = session.follow("J100744")
     assert "UNMAPPED" in msg and "k162" in msg.lower()
