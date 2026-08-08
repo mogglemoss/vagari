@@ -13,7 +13,7 @@ from textual.containers import Horizontal
 from textual.widgets import Footer, Input, Static, Tree
 
 from vagari.enrichers.activity import fetch_system_kills
-from vagari.followme.logtail import detect_chatlog_dir, tail_system_changes
+from vagari.followme.logtail import LocalEvent, detect_chatlog_dir, tail_local_files
 from vagari.model.store import Store
 from vagari.session import Session
 from vagari.ui.about_screen import AboutScreen
@@ -168,11 +168,17 @@ class MapperApp(App):
             if chatlog_dir is None:
                 self.status(
                     "Chatlogs not found — follow-me disabled. "
-                    "Set VAGARI_LOG_DIR to your EVE Chatlogs directory."
+                    "Set VAGARI_LOG_DIR to your EVE Chatlogs directory, and "
+                    "ensure 'Log chat to file' is on in EVE's settings."
                 )
             else:
+                import os
+
+                self.session.pilot_lock = os.environ.get("VAGARI_PILOT") or None
+                who = self.session.pilot_lock or "first pilot to jump"
+                self.status(f"Monitoring {chatlog_dir.name} — following {who}.")
                 self.run_worker(
-                    tail_system_changes(chatlog_dir, self._on_system_change),
+                    tail_local_files(chatlog_dir, self._on_local_event),
                     exclusive=True,
                     group="follow",
                 )
@@ -185,8 +191,8 @@ class MapperApp(App):
     def _auto_recon(self) -> None:
         self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
 
-    async def _on_system_change(self, name: str) -> None:
-        message = self.session.follow(name)
+    async def _on_local_event(self, event: LocalEvent) -> None:
+        message = self.session.follow_event(event.pilot, event.system, event.initial)
         if message is not None:
             self._after_engine(message)
 

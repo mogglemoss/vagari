@@ -39,7 +39,7 @@ THE BUREAU IS MERELY NOTING.
 
 `lazy` arms strict reconciliation: the next deposit also reports which signatures have despawned, and `sweep` strikes them from the record. A wormhole with mapped systems behind it is never struck by a sweep. The Bureau does not shred files that other files refer to.
 
-**The map follows you.** VAGARI tails your EVE chat logs (locally; CCP writes them precisely so tools may read them) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Arrive somewhere unmapped and the Bureau notes the discrepancy and offers you a form: press `k` and the arrival is filed as a K162 with a placeholder signature, destination class, statics, and weather already annotated. Relabel it when you scan the real sig. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
+**The map follows you.** VAGARI tails your EVE chat logs (locally; CCP writes them precisely so tools may read them — enable "Log chat to file" in EVE's settings) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Multiboxing is understood: every client's log is watched, each tagged with its pilot, and the Bureau follows the first pilot who actually jumps — the one being flown, not the one spamming Jita local. `pilot` reports the roster; `pilot <name>` locks to a character (`VAGARI_PILOT` env for a standing order); `pilot off` releases. Arrive somewhere unmapped and the Bureau notes the discrepancy and offers you a form: press `k` and the arrival is filed as a K162 with a placeholder signature, destination class, statics, and weather already annotated. Relabel it when you scan the real sig. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
 
 **Wormholes carry countdowns.** Type a hole (`abc H296`) and it knows its target class, mass, size, and book lifetime. The tree shows an upper-bound countdown — `≤13h04m` — amber when waning, and `EXPIRED?` when the paperwork has outlived the physics. Mark end-of-life in one key; the estimate caps itself at four hours accordingly. The bound is honest: it counts from when *you* first mapped the hole, which is the only fact the Bureau actually possesses.
 
@@ -104,6 +104,7 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `eol abc` / `crit abc` | toggle end-of-life · cycle mass state |
 | `k162` | file a pending unmapped arrival |
 | `chain <name>` | switch chain of custody |
+| `pilot [name\|off]` | who follow-me follows (multibox); default: first to jump |
 | `recon` | refresh system activity from ESI |
 | `undo` / `redo` | the record, backward and forward |
 

@@ -40,6 +40,10 @@ class Session:
     zkill_stats: dict = field(default_factory=dict, init=False)
     # Follow-me: an arrival the chain can't place — (system name, path we came from).
     pending_arrival: tuple[str, list[str]] | None = field(default=None, init=False)
+    # Multibox follow-me: locked pilot (None = first to jump wins) and each
+    # observed pilot's last known system.
+    pilot_lock: str | None = field(default=None, init=False)
+    known_pilots: dict = field(default_factory=dict, init=False)
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -138,6 +142,8 @@ class Session:
             return self._mass(rest[0])
         if head == "chain" and rest:
             return self._switch_chain(rest[0])
+        if head == "pilot":
+            return self.pilot_command(" ".join(rest) if rest else None)
         if head == "here" and rest:
             return self._name_system(self.chain.current(), rest[0].upper()
                                      if _JCODE.match(rest[0]) else " ".join(rest))
@@ -239,6 +245,50 @@ class Session:
         return f"{conn.sig_prefix} typed {code} (→{wh_type.target_display}{life})."
 
     # -- follow-me (chatlog) -------------------------------------------------
+
+    def follow_event(self, pilot: str, system: str, initial: bool) -> str | None:
+        """Multibox policy for tailer events.
+
+        Follow only the locked pilot. With no lock, the first pilot who
+        actually JUMPS (a live event) takes the lock — the character moving
+        through space is the one being flown. Initial events only record
+        each pilot's position so `pilot <name>` can sync immediately.
+        """
+        self.known_pilots[pilot] = system
+        if initial:
+            if self.pilot_lock == pilot:
+                return self.follow(system)
+            return None
+        if self.pilot_lock is None:
+            self.pilot_lock = pilot
+            moved = self.follow(system)
+            return f"FOLLOWING {pilot}. " + (moved or "Position noted.")
+        if pilot != self.pilot_lock:
+            return None
+        return self.follow(system)
+
+    def pilot_command(self, arg: str | None) -> str:
+        """`pilot` — report; `pilot off` — unlock; `pilot <name>` — lock."""
+        if not arg:
+            roster = ", ".join(
+                f"{p} ({s})" + (" ←" if p == self.pilot_lock else "")
+                for p, s in sorted(self.known_pilots.items())
+            ) or "none observed yet"
+            lock = self.pilot_lock or "first pilot to jump"
+            return f"Following: {lock}. On record: {roster}."
+        if arg.lower() == "off":
+            self.pilot_lock = None
+            return "Lock released — following the first pilot to jump."
+        match = next(
+            (p for p in self.known_pilots if p.lower() == arg.lower()), None
+        )
+        pilot = match or arg
+        self.pilot_lock = pilot
+        known = self.known_pilots.get(pilot)
+        if known:
+            moved = self.follow(known)
+            return f"FOLLOWING {pilot}. " + (moved or f"Position: {known}.")
+        return f"FOLLOWING {pilot} — no position on record yet."
 
     def follow(self, name: str) -> str | None:
         """The pilot entered `name` in-game; move ◉ YOU. None = no change."""

@@ -6,9 +6,10 @@ from pathlib import Path
 import pytest
 
 from vagari.followme.logtail import (
-    latest_local_log,
+    LocalEvent,
+    parse_listener,
     parse_system_change,
-    tail_system_changes,
+    tail_local_files,
 )
 from vagari.model.chain import SigGroup
 from vagari.model.store import Store
@@ -106,74 +107,134 @@ def test_here_command(session):
 def test_parse_system_change():
     line = "[ 2026.08.06 12:00:00 ] EVE System > Channel changed to Local : Jita"
     assert parse_system_change(line) == "Jita"
+    # EVE writes a BOM at the start of every message line.
+    assert parse_system_change("﻿" + line) == "Jita"
     assert parse_system_change("[ 2026.08.06 12:00:00 ] Some Pilot > o7") is None
     assert parse_system_change("garbage") is None
+
+
+def header(listener: str) -> list[str]:
+    return [
+        "﻿",
+        "  ---------------------------------------",
+        "  Channel ID:      local",
+        "  Channel Name:    Local",
+        f"  Listener:        {listener}",
+        "  Session started: 2026.08.06 12:00:00",
+        "  ---------------------------------------",
+    ]
+
+
+def sysline(name: str, ts: str = "2026.08.06 12:00:00") -> str:
+    return f"﻿[ {ts} ] EVE System > Channel changed to Local : {name}"
+
+
+def chatline(pilot: str, text: str) -> str:
+    return f"﻿[ 2026.08.06 12:30:00 ] {pilot} > {text}"
 
 
 def write_log(path: Path, lines: list[str]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-16-le")
 
 
-def sysline(name: str, ts: str = "2026.08.06 12:00:00") -> str:
-    return f"[ {ts} ] EVE System > Channel changed to Local : {name}"
-
-
-def test_latest_local_log(tmp_path):
-    assert latest_local_log(tmp_path) is None
-    a = tmp_path / "Local_20260806_100000.txt"
-    write_log(a, [sysline("Jita")])
-    assert latest_local_log(tmp_path) == a
+def test_parse_listener():
+    assert parse_listener("\n".join(header("Cormorant Fell"))) == "Cormorant Fell"
+    assert parse_listener("no header here") is None
 
 
 @pytest.mark.asyncio
-async def test_tail_replays_only_last_then_streams(tmp_path):
-    log = tmp_path / "Local_20260806_100000.txt"
-    write_log(log, [sysline("Jita"), sysline("Perimeter")])
+async def test_multibox_tailing(tmp_path):
+    """Two live clients: events carry the right pilot; spam in one file does
+    not disturb the other; replay yields one initial event per pilot."""
+    hunter = tmp_path / "Local_20260806_100000_111.txt"
+    trader = tmp_path / "Local_20260806_100001_222.txt"
+    write_log(hunter, header("Hunter") + [sysline("J105443")])
+    write_log(trader, header("Trader") + [sysline("Jita")])
 
-    seen: list[str] = []
+    events: list[LocalEvent] = []
 
-    async def on_system(name: str) -> None:
-        seen.append(name)
+    async def on_event(e: LocalEvent) -> None:
+        events.append(e)
 
-    task = asyncio.create_task(
-        tail_system_changes(tmp_path, on_system, poll_interval=0.02)
-    )
+    task = asyncio.create_task(tail_local_files(tmp_path, on_event, poll_interval=0.02))
     try:
         await asyncio.sleep(0.1)
-        assert seen == ["Perimeter"]  # history replay yields only the last
+        assert {(e.pilot, e.system, e.initial) for e in events} == {
+            ("Hunter", "J105443", True),
+            ("Trader", "Jita", True),
+        }
 
-        with open(log, "a", encoding="utf-16-le") as f:
-            f.write(sysline("J105443") + "\n")
+        # Trade-hub spam bumps the trader file: no system events at all.
+        with open(trader, "a", encoding="utf-16-le") as f:
+            f.write(chatline("Spammer", "HyperNet offer: Golem") + "\n")
         await asyncio.sleep(0.1)
-        assert seen == ["Perimeter", "J105443"]
+        assert len(events) == 2
+
+        # The hunter jumps: a live event tagged with the right pilot.
+        with open(hunter, "a", encoding="utf-16-le") as f:
+            f.write(sysline("J154535") + "\n")
+        await asyncio.sleep(0.1)
+        assert events[-1] == LocalEvent("Hunter", "J154535", False)
     finally:
         task.cancel()
         await task
 
 
 @pytest.mark.asyncio
-async def test_tail_switches_to_newer_log(tmp_path):
-    old = tmp_path / "Local_20260806_100000.txt"
-    write_log(old, [sysline("Jita")])
+async def test_tail_picks_up_new_session_file(tmp_path):
+    events: list[LocalEvent] = []
 
-    seen: list[str] = []
+    async def on_event(e: LocalEvent) -> None:
+        events.append(e)
 
-    async def on_system(name: str) -> None:
-        seen.append(name)
-
-    task = asyncio.create_task(
-        tail_system_changes(tmp_path, on_system, poll_interval=0.02)
-    )
+    task = asyncio.create_task(tail_local_files(tmp_path, on_event, poll_interval=0.02))
     try:
+        await asyncio.sleep(0.05)
+        assert events == []
+        late = tmp_path / "Local_20260806_110000_333.txt"
+        write_log(late, header("Latecomer") + [sysline("Amarr")])
         await asyncio.sleep(0.1)
-        assert seen == ["Jita"]
-
-        new = tmp_path / "Local_20260806_110000.txt"
-        write_log(new, [sysline("Amarr")])
-        import os
-        os.utime(new, None)
-        await asyncio.sleep(0.15)
-        assert seen == ["Jita", "Amarr"]
+        assert events == [LocalEvent("Latecomer", "Amarr", True)]
     finally:
         task.cancel()
         await task
+
+
+# -- multibox follow policy ---------------------------------------------------
+
+def test_follow_event_locks_on_first_live_jump(session):
+    # Initial positions never move the marker without a lock.
+    assert session.follow_event("Trader", "Jita", initial=True) is None
+    assert session.chain.location == []
+
+    # First live jump takes the lock.
+    msg = session.follow_event("Hunter", "J154535", initial=False)
+    assert "FOLLOWING Hunter" in msg
+    assert session.pilot_lock == "Hunter"
+    assert session.chain.location == ["QLM"]
+
+    # Other pilots' jumps are ignored once locked.
+    assert session.follow_event("Trader", "Perimeter", initial=False) is None
+    assert session.chain.location == ["QLM"]
+
+
+def test_pilot_command_reports_and_switches(session):
+    session.follow_event("Trader", "Jita", initial=True)
+    session.follow_event("Hunter", "J154535", initial=False)
+
+    report = session.pilot_command(None)
+    assert "Hunter" in report and "Trader" in report and "Following: Hunter" in report
+
+    msg = session.pilot_command("trader")  # case-insensitive
+    assert "FOLLOWING Trader" in msg
+    assert session.pilot_lock == "Trader"
+
+    assert "first pilot to jump" in session.pilot_command("off")
+    assert session.pilot_lock is None
+
+
+def test_pilot_lock_applies_initial_position(session):
+    session.pilot_lock = "Hunter"
+    msg = session.follow_event("Hunter", "J154535", initial=True)
+    assert msg is not None
+    assert session.chain.location == ["QLM"]

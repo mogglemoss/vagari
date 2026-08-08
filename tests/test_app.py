@@ -121,15 +121,16 @@ async def test_follow_me_end_to_end(tmp_path, monkeypatch):
     chatlogs = tmp_path / "Chatlogs"
     chatlogs.mkdir()
     monkeypatch.setenv("VAGARI_LOG_DIR", str(chatlogs))
-    from vagari.followme.logtail import tail_system_changes as real_tail
+    from vagari.followme.logtail import tail_local_files as real_tail
 
     monkeypatch.setattr(
-        "vagari.main.tail_system_changes",
+        "vagari.main.tail_local_files",
         lambda d, cb: real_tail(d, cb, poll_interval=0.02),
     )
 
-    log = chatlogs / "Local_20260806_100000.txt"
+    log = chatlogs / "Local_20260806_100000_111.txt"
     log.write_text(
+        "  Listener:        Hunter\n"
         "[ 2026.08.06 12:00:00 ] EVE System > Channel changed to Local : J105443\n",
         encoding="utf-16-le",
     )

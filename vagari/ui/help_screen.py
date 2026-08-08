@@ -61,6 +61,8 @@ _HELP_TEXT = """\
   [bold]z[/bold] / [bold]Z[/bold]      undo / redo (unbounded)
   [bold]chain <name>[/bold] switch chain of custody
   [bold]recon[/bold]      refresh system activity (ESI)
+  [bold]pilot[/bold]      who is followed · [bold]pilot <name>[/bold] lock
+             [bold]pilot off[/bold] → first pilot to jump wins
 
 [#3a3530]── follow-me ────────────────────────────[/#3a3530]
   [#7a756e]jump in-game and ◉ YOU follows via chatlog[/#7a756e]
