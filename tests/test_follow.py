@@ -11,7 +11,7 @@ from vagari.followme.logtail import (
     parse_system_change,
     tail_local_files,
 )
-from vagari.model.chain import SigGroup
+from vagari.model.chain import Signature, SigGroup
 from vagari.model.store import Store
 from vagari.session import Session
 
@@ -55,6 +55,50 @@ def test_follow_finds_system_elsewhere_in_chain(session):
     msg = session.follow("J164417")
     assert "elsewhere in the chain" in msg
     assert session.chain.location == ["QLM", "ASD"]
+
+
+def test_arrival_resolves_single_unknown_hole(tmp_path):
+    """Field-reported: jumping through a typed hole whose far side is '?'
+    must name that far side, not spawn a duplicate sibling placeholder."""
+    sess = Session.open(Store(base_dir=tmp_path / "state"))
+    sess.chain.root.name = "J103529"
+    sess.ingest("HUV-843\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t1 AU")
+    sess.execute("huv U210")            # opens HUV → "?" (books lowsec)
+    msg = sess.follow("J141150")        # the actual arrival
+    assert "Assumed you took HUV" in msg
+    assert "J141150" in msg
+    assert "verify the type" in msg     # U210 books L; J141150 is C1
+    assert sess.pending_arrival is None
+    assert sess.chain.location == ["HUV"]
+    child = sess.chain.root.find_connection("HUV").child
+    assert child.name == "J141150"
+    assert child.jclass == "C1"         # renamed AND re-enriched
+    assert len(sess.chain.root.connections) == 1  # no duplicate sibling
+
+
+def test_rekey_merges_duplicate_sibling(tmp_path):
+    """Cleanup for chains already bearing the duplicate: `zaa = huv` folds
+    the placeholder branch into the opened hole with the '?' far side."""
+    sess = Session.open(Store(base_dir=tmp_path / "state"))
+    sess.chain.root.name = "J103529"
+    sess.ingest("HUV-843\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t1 AU")
+    sess.execute("huv U210")            # HUV → "?"
+    sess.pending_arrival = ("J141150", [])
+    sess.file_k162()                    # the old bug: ZAA → J141150 sibling
+    sess.chain.current().sigs.append(Signature(sig_id="INA-123"))
+    assert len(sess.chain.root.connections) == 2
+
+    msg = sess.execute("zaa = huv")     # standing inside via ZAA
+    assert "merged into HUV" in msg and "J141150" in msg
+    root = sess.chain.root
+    assert len(root.connections) == 1
+    conn = root.find_connection("HUV")
+    assert conn.child.name == "J141150"
+    assert conn.child.find_sig("INA") is not None   # subtree survives
+    assert conn.wh_type == "U210"                   # typed side wins
+    assert root.find_sig("ZAA") is None
+    assert sess.chain.location == ["HUV"]           # path follows the merge
+    assert sess.chain.current().name == "J141150"
 
 
 def test_follow_unmapped_offers_k162(session):

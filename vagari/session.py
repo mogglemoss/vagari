@@ -330,6 +330,31 @@ class Session:
             self._commit(amend=True)
             return f"Relocated ◉ YOU to {name} (elsewhere in the chain)."
 
+        # An opened hole with an unknown destination: if exactly one exists,
+        # assume that is the one you took and name its far side — arriving
+        # through a mapped-but-unresolved wormhole must not spawn a duplicate
+        # sibling connection.
+        unknown = [c for c in current.connections if c.child.name == "?"]
+        if len(unknown) == 1:
+            conn = unknown[0]
+            expected = conn.child.jclass
+            self._name_system(conn.child, name)
+            chain.location.append(conn.sig_prefix)
+            self.pending_arrival = None
+            self._commit()
+            note = ""
+            info = lookup_system(name)
+            actual = info.jclass if info else None
+            if expected and actual and expected != actual:
+                note = (
+                    f" ({conn.wh_type or conn.sig_prefix} books {expected}; "
+                    f"{name} is {actual} — verify the type.)"
+                )
+            return (
+                f"Assumed you took {conn.sig_prefix}: destination now on "
+                f"record as {name}.{note}"
+            )
+
         self.pending_arrival = (name, list(chain.location))
         return (
             f"Arrived in UNMAPPED {name}. Press k (or submit `k162`) to file it "
@@ -460,7 +485,36 @@ class Session:
             # The real signature is already on file (pasted after scanning):
             # absorb the placeholder into it. The scanned record keeps its
             # true id, name, and signal; the connection re-points.
-            if here.find_connection(new_prefix) is not None:
+            target_conn = here.find_connection(new_prefix)
+            if target_conn is not None:
+                # Two connections merge only when the target's far side is an
+                # empty unknown — the duplicate-sibling case (a placeholder
+                # filed for an arrival that was really this opened hole).
+                if target_conn.child.name == "?" and not (
+                    target_conn.child.sigs or target_conn.child.connections
+                ):
+                    if conn is None:
+                        raise ChainError(
+                            f"{old_prefix} has no connection to merge into "
+                            f"{new_prefix}"
+                        )
+                    target_conn.child = conn.child
+                    if not target_conn.wh_type:
+                        target_conn.wh_type = conn.wh_type
+                    here.connections.remove(conn)
+                    here.sigs.remove(sig)
+                    if (
+                        self.chain.location
+                        and self.chain.location[-1] == old_prefix
+                        and len(candidates) > 1
+                        and here is candidates[1]
+                    ):
+                        self.chain.location[-1] = new_prefix
+                    self._commit()
+                    return (
+                        f"{old_prefix} merged into {new_prefix} — the unknown "
+                        f"destination is struck; {target_conn.child.name} stands."
+                    )
                 raise ChainError(
                     f"{new_prefix} is itself an opened wormhole — refile "
                     "would merge two connections"
