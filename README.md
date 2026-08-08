@@ -41,7 +41,9 @@ Every deposit also reports which signatures have despawned; press `s` (or submit
 
 **The map follows you.** VAGARI tails your EVE chat logs (locally; CCP writes them precisely so tools may read them — enable "Log chat to file" in EVE's settings) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Multiboxing is understood: every client's log is watched, each tagged with its pilot, and the Bureau follows the first pilot who actually jumps — the one being flown, not the one spamming Jita local. `pilot` reports the roster; `pilot <name>` locks to a character (`VAGARI_PILOT` env for a standing order); `pilot off` releases. Arrive somewhere unmapped and the Bureau notes the discrepancy and offers you a form: press `k` and the arrival is filed as a K162 with a placeholder signature, destination class, statics, and weather already annotated. Relabel it when you scan the real sig. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
 
-**Wormholes carry countdowns.** Type a hole (`abc H296`) and it knows its target class, mass, size, and book lifetime. The tree shows an upper-bound countdown — `≤13h04m` — amber when waning, and `EXPIRED?` when the paperwork has outlived the physics. Mark end-of-life in one key; the estimate caps itself at four hours accordingly. The bound is honest: it counts from when *you* first mapped the hole, which is the only fact the Bureau actually possesses.
+**Wormholes carry countdowns.** Type a hole (`abc H296`) and it knows its target class, mass, size, and book lifetime. The tree shows an upper-bound countdown — `≤13h04m` — amber when waning, and `EXPIRED?` when the paperwork has outlived the physics. Mark end-of-life in one key and the four-hour clock runs from that moment — two hours later the badge honestly reads `≤2h`. The bound is honest: it counts from when *you* first mapped the hole, which is the only fact the Bureau actually possesses.
+
+**The chain watches with you.** Fleetmates' positions appear as `◎ Name` markers wherever their clients are logged in (from the same chatlogs follow-me reads); systems whose scans have gone stale say so (`scanned 9h ago`); and the watchtower flares the mascot and names any chain system that turns hostile between recon sweeps. THE BUREAU IS MERELY NOTING. LOUDLY.
 
 **Reconnaissance, on request.** `recon` files one unauthenticated request to ESI's public kill feed and annotates every system in your chain with last-hour ship, pod, and NPC kills. Offline it declines to guess. THE BUREAU DOES NOT SPECULATE OFFLINE.
 
@@ -105,6 +107,8 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `return abc [TYPE]` | pair ABC with its system's inbound hole (+true type read there) |
 | `sever abc` | collapsed hole: far side becomes an adrift fragment |
 | `fragment [name]` | file a disconnected fragment (or a pending arrival) |
+| `discard N` | strike adrift fragment N whole (`discard!` forces) |
+| `copy route` | homeward route to the clipboard |
 | `… @system` | address a sig elsewhere in the chain (else: current, then unique) |
 | `here <name>` | name the current system |
 | `flag abc` / `del abc` | flag · strike (`del!` forces) |

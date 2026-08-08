@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 from vagari.model.chain import (
     Chain, ChainError, Connection, MassState, Signature, SigGroup, System,
+    utcnow,
 )
 from vagari.model.reconcile import ReconcileReport, apply_despawn, reconcile
 from vagari.model.store import Store
@@ -49,7 +50,9 @@ class Session:
     # -- lifecycle -----------------------------------------------------------
 
     @classmethod
-    def open(cls, store: Store, name: str = "home") -> Session:
+    def open(cls, store: Store, name: str | None = None) -> Session:
+        if name is None:
+            name = store.load_active() or "home"
         chain = store.load_latest(name)
         if chain is None:
             chain = Chain(name=name)
@@ -192,6 +195,8 @@ class Session:
             return self._sever(rest[0], at)
         if head == "fragment":
             return self._fragment(" ".join(rest) if rest else None)
+        if head in ("discard", "discard!") and rest:
+            return self._discard(rest[0], force=head == "discard!")
         if _PREFIX.match(head) and rest:
             return self._sig_command(head, rest, at)
         return f"Unrecognised submission: {raw!r}. See `?` for accepted forms."
@@ -267,8 +272,9 @@ class Session:
     def _eol(self, prefix: str, at: str | None = None) -> str:
         system, conn = self._connection_of(prefix, at)
         conn.eol = not conn.eol
+        conn.eol_marked_at = utcnow() if conn.eol else None
         self._commit()
-        state = "END OF LIFE" if conn.eol else "no longer EOL"
+        state = "END OF LIFE (≤4h from now)" if conn.eol else "no longer EOL"
         return f"{conn.sig_prefix} ({system.name}) marked {state}."
 
     def _mass(self, prefix: str, at: str | None = None) -> str:
@@ -325,6 +331,7 @@ class Session:
         child = conn.child
         system.connections.remove(conn)
         system.sigs.remove(sig)
+        child.adrift_since = utcnow()
         self.chain.roots.append(child)
         new_ri = len(self.chain.roots) - 1
         inside = path + [sig.prefix]
@@ -358,7 +365,7 @@ class Session:
                 "Nothing to file: name it (`fragment J123456`) or arrive "
                 "somewhere unmapped first."
             )
-        system = System(name=name)
+        system = System(name=name, adrift_since=utcnow())
         info = lookup_system(name)
         if info is not None:
             system.jclass = info.jclass
@@ -369,6 +376,30 @@ class Session:
         self.pending_arrival = None
         self._commit()
         return f"{name} filed as fragment #{len(self.chain.roots)} — ◉ YOU placed there."
+
+    def _discard(self, number: str, force: bool = False) -> str:
+        """Strike an entire adrift fragment (1-based, as displayed)."""
+        try:
+            ri = int(number.lstrip("#")) - 1
+        except ValueError:
+            raise ChainError(f"{number!r} is not a fragment number") from None
+        if not 0 <= ri < len(self.chain.roots):
+            raise ChainError(f"no fragment #{number.lstrip('#')} on this chain")
+        if len(self.chain.roots) == 1:
+            raise ChainError("this is the only fragment — the map must map something")
+        if self.chain.location[0] == ri:
+            raise ChainError("you are inside that fragment — leave before discarding")
+        fragment = self.chain.roots[ri]
+        if (fragment.sigs or fragment.connections) and not force:
+            raise ChainError(
+                f"fragment #{ri + 1} ({fragment.name}) still has mapped content "
+                "— `discard!` to force"
+            )
+        self.chain.roots.pop(ri)
+        if self.chain.location[0] > ri:
+            self.chain.location[0] -= 1
+        self._commit()
+        return f"Fragment #{ri + 1} ({fragment.name}) struck from the record."
 
     def _adopt_fragment(self, system: System, path: list, prefix: str,
                         frag_ri: int) -> str:
@@ -381,6 +412,7 @@ class Session:
         sig = self._require_prefix(system, prefix)
         fragment = self.chain.roots[frag_ri]
         sig.group = SigGroup.WORMHOLE
+        fragment.adrift_since = None
         conn = Connection(sig_prefix=sig.prefix, child=fragment)
         system.connections.append(conn)
         self.chain.roots.pop(frag_ri)
@@ -397,6 +429,7 @@ class Session:
 
     def _switch_chain(self, name: str) -> str:
         self.chain = self.store.load_latest(name) or Chain(name=name)
+        self.store.save_active(name)
         self.store.commit(self.chain)
         self.view = "full"
         self.last_report = None
@@ -786,21 +819,25 @@ class Session:
         """Strike connections past their book lifetime (EXPIRED in the tree)."""
         from vagari.model.lifetime import LifeStatus, assess
 
-        here = self.chain.current()
-        expired = [
-            c.sig_prefix for c in list(here.connections)
-            if assess(c).status is LifeStatus.EXPIRED
-        ]
+        expired: list[tuple[list, System, str]] = []
+
+        def walk(path: list, system: System) -> None:
+            for conn in list(system.connections):
+                if assess(conn).status is LifeStatus.EXPIRED:
+                    expired.append((path, system, conn.sig_prefix))
+                walk(path + [conn.sig_prefix], conn.child)
+
+        for ri, root in enumerate(self.chain.roots):
+            walk([ri], root)
         if not expired:
-            return "Nothing past its book lifetime here."
+            return "Nothing past its book lifetime anywhere on the chain."
         removed, blocked = [], []
-        here_path = list(self.chain.location)
-        for prefix in expired:
+        for path, system, prefix in expired:
             try:
-                here.remove_sig(prefix, force=force)
-                removed.append(prefix)
+                system.remove_sig(prefix, force=force)
+                removed.append(f"{prefix} ({system.name})")
             except ChainError:
-                blocked.append(self._sever_conn(here_path, here, prefix))
+                blocked.append(self._sever_conn(path, system, prefix))
         if removed or blocked:
             self._commit()
         parts = []
@@ -812,8 +849,9 @@ class Session:
 
     # -- activity history (auto-recon sampling) ------------------------------
 
-    def sample_activity(self, cap: int = 24) -> None:
-        """Record a per-system PvP-kill sample for every system in the chain."""
+    def sample_activity(self, cap: int = 24) -> list[str]:
+        """Record a per-system PvP-kill sample for every system in the chain.
+        Returns watchtower alerts: systems that just turned hostile."""
         systems: list = []
 
         def walk(system) -> None:
@@ -821,7 +859,9 @@ class Session:
             for conn in system.connections:
                 walk(conn.child)
 
-        walk(self.chain.root)
+        for root in self.chain.roots:
+            walk(root)
+        alerts: list[str] = []
         for system in systems:
             info = lookup_system(system.name)
             if info is None:
@@ -829,8 +869,15 @@ class Session:
             act = self.activity.get(info.system_id)
             pvp = (act.ship_kills + act.pod_kills) if act else 0
             history = self.activity_history.setdefault(info.system_id, [])
+            was_quiet = not history or history[-1] == 0
             history.append(pvp)
             del history[:-cap]
+            if pvp > 0 and was_quiet and len(history) > 1:
+                alerts.append(
+                    f"{system.name} ({pvp} PvP kill{'s' if pvp != 1 else ''} "
+                    "in the last hour)"
+                )
+        return alerts
 
     def _name_system(self, system, name: str) -> str:
         system.name = name

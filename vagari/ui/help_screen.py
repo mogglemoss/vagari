@@ -8,7 +8,7 @@ from textual.binding import Binding
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
-_HELP_TEXT = """\
+_HELP_TEXT = r"""
 [bold #C15F3C]ANOIKIS CARTOGRAPHIC BUREAU[/bold #C15F3C]  [#7a756e]instrument reference[/#7a756e]
 
 [#3a3530]── how to drive it ──────────────────────[/#3a3530]
@@ -48,6 +48,7 @@ _HELP_TEXT = """\
   [bold]sever abc[/bold]  collapsed hole → far side becomes
              an adrift fragment (kept, not lost)
   [bold]fragment \[name][/bold] file an unattached fragment
+  [bold]discard N[/bold]  strike adrift fragment N whole
   [bold]cull[/bold]       strike holes past book lifetime
              (mapped children sever, not vanish)
   [bold]c[/bold] / [bold]copy[/bold]   chain as text to clipboard
@@ -73,6 +74,7 @@ _HELP_TEXT = """\
   [bold]1[/bold]–[bold]5[/bold]      all / paths / sites / gas / combat
   [bold]y[/bold]        cursor to ◉ YOU
   [bold]h[/bold] / [bold]home[/bold]   the route home, door by door
+  [bold]copy route[/bold] homeward route to clipboard
   [bold]z[/bold] / [bold]Z[/bold]      undo / redo (unbounded)
   [bold]chain <name>[/bold] switch chain of custody
   [bold]recon[/bold]      refresh system activity (ESI)

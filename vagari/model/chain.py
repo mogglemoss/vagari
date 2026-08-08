@@ -95,6 +95,8 @@ class Connection:
     # (not yet established).
     wh_type: str | None = None
     k162_end: str | None = None
+    # When the pilot marked end-of-life — EVE's ~4h clock runs from here.
+    eol_marked_at: datetime | None = None
     # The far side's sig prefix in the CHILD system. Pairs the two halves
     # of one wormhole; direction-neutral.
     return_prefix: str | None = None
@@ -108,6 +110,9 @@ class Connection:
             "child": self.child.to_dict(),
             "wh_type": self.wh_type,
             "k162_end": self.k162_end,
+            "eol_marked_at": (
+                self.eol_marked_at.isoformat() if self.eol_marked_at else None
+            ),
             "return_prefix": self.return_prefix,
             "eol": self.eol,
             "mass": self.mass.value,
@@ -125,6 +130,11 @@ class Connection:
             k162_end=d.get(
                 "k162_end", "parent" if d["wh_type"] == "K162" else None
             ),
+            eol_marked_at=(
+                datetime.fromisoformat(d["eol_marked_at"])
+                if d.get("eol_marked_at")
+                else None
+            ),
             return_prefix=d.get("return_prefix"),
             eol=d["eol"],
             mass=MassState(d["mass"]),
@@ -140,6 +150,9 @@ class System:
     effect: str | None = None       # "Magnetar"
     sigs: list[Signature] = field(default_factory=list)
     connections: list[Connection] = field(default_factory=list)
+    # Set while this system is an adrift fragment root (severed or filed
+    # disconnected); cleared on adoption.
+    adrift_since: datetime | None = None
 
     def find_sig(self, prefix: str) -> Signature | None:
         p = norm_prefix(prefix)
@@ -184,6 +197,9 @@ class System:
             "effect": self.effect,
             "sigs": [s.to_dict() for s in self.sigs],
             "connections": [c.to_dict() for c in self.connections],
+            "adrift_since": (
+                self.adrift_since.isoformat() if self.adrift_since else None
+            ),
         }
 
     @classmethod
@@ -195,6 +211,11 @@ class System:
             effect=d["effect"],
             sigs=[Signature.from_dict(s) for s in d["sigs"]],
             connections=[Connection.from_dict(c) for c in d["connections"]],
+            adrift_since=(
+                datetime.fromisoformat(d["adrift_since"])
+                if d.get("adrift_since")
+                else None
+            ),
         )
 
 

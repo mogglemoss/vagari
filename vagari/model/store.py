@@ -153,6 +153,16 @@ class Store:
         else:
             f.unlink(missing_ok=True)
 
+    def load_active(self) -> str | None:
+        try:
+            return (self.base_dir / "ACTIVE").read_text().strip() or None
+        except OSError:
+            return None
+
+    def save_active(self, name: str) -> None:
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        (self.base_dir / "ACTIVE").write_text(name)
+
     def chains(self) -> list[str]:
         if not self.base_dir.exists():
             return []

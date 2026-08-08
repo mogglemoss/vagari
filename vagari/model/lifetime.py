@@ -43,7 +43,13 @@ def assess(conn: Connection, now: datetime | None = None) -> Life:
     remaining = max(0.0, total - age)
 
     if conn.eol:
-        # In-game EOL means under ~4h regardless of our upper bound.
+        # In-game EOL means under ~4h from the moment it was NOTICED —
+        # count down from the marking, bounded by the book estimate.
+        if conn.eol_marked_at is not None:
+            eol_left = WANING_HOURS - (
+                ((now or utcnow()) - conn.eol_marked_at).total_seconds() / 3600
+            )
+            return Life(LifeStatus.EOL, total, max(0.0, min(remaining, eol_left)))
         return Life(LifeStatus.EOL, total, min(remaining, WANING_HOURS))
     if remaining <= 0:
         return Life(LifeStatus.EXPIRED, total, 0.0)

@@ -135,6 +135,10 @@ class MapperApp(App):
             self.action_show_homeward,
         )
         yield SystemCommand(
+            "Copy route", "Homeward route to the clipboard",
+            self.action_copy_route,
+        )
+        yield SystemCommand(
             "Copy chain", "Plain-text tree to the clipboard", self.action_copy_chain
         )
         yield SystemCommand(
@@ -228,7 +232,13 @@ class MapperApp(App):
             return
         self.session.activity = activity
         self.session.activity_fetched = True
-        self.session.sample_activity()
+        alerts = self.session.sample_activity()
+        if alerts:
+            self.query_one(VagariHeader).flare()
+            self.status(
+                "WATCHTOWER: activity in " + "; ".join(alerts)
+                + ". The Bureau is merely noting. Loudly."
+            )
         node = self.query_one(ChainTree).cursor_node
         self.query_one(DetailPanel).show_node(node.data if node else None)
         self.status(f"Reconnaissance filed: activity for {len(activity)} systems.")
@@ -285,6 +295,9 @@ class MapperApp(App):
             return
         if text in ("?", "help"):
             self.action_show_help()
+            return
+        if text in ("copy route", "copy home", "route copy"):
+            self.action_copy_route()
             return
         if text == "recon":
             self.status("Reconnaissance dispatched…")
@@ -436,6 +449,10 @@ class MapperApp(App):
 
     def action_file_k162(self) -> None:
         self._after_engine(self.session.file_k162())
+
+    def action_copy_route(self) -> None:
+        self.copy_to_clipboard(self.session.homeward())
+        self.status("Route copied to clipboard. Distribute to the lost.")
 
     def action_show_homeward(self) -> None:
         self.status(self.session.homeward())

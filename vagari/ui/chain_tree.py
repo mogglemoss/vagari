@@ -48,7 +48,8 @@ def _visible(sig: Signature, view: str) -> bool:
     return True
 
 
-def system_label(system: System, here: bool, kinfo=None) -> str:
+def system_label(system: System, here: bool, kinfo=None,
+                 pilots: tuple = (), now: datetime | None = None) -> str:
     parts = [f"[bold {TEXT}]{system.name}[/bold {TEXT}]"]
     meta = []
     if system.jclass:
@@ -61,8 +62,16 @@ def system_label(system: System, here: bool, kinfo=None) -> str:
         meta.append(kinfo.region)
     if meta:
         parts.append(f"[{MUTED}]{' · '.join(meta)}[/{MUTED}]")
+    if system.sigs:
+        freshest = max(s.last_seen for s in system.sigs)
+        if ((now or utcnow()) - freshest).total_seconds() / 3600 >= STALE_HOURS:
+            parts.append(
+                f"[{FADED}](scanned {age_text(freshest, now)} ago)[/{FADED}]"
+            )
     if here:
         parts.append(f"[bold {RUST}]◉ YOU[/bold {RUST}]")
+    for name in pilots:
+        parts.append(f"[{WARN}]◎ {name}[/{WARN}]")
     return "  ".join(parts)
 
 
@@ -173,6 +182,12 @@ class ChainTree(Tree):
             return True
         return False
 
+    def _fleet(self, system_name: str) -> tuple:
+        return tuple(
+            p for p, s in sorted(self.session.known_pilots.items())
+            if s == system_name and p != self.session.pilot_lock
+        )
+
     def rebuild(self) -> None:
         chain = self.session.chain
         cursor_data = self.cursor_node.data if self.cursor_node else None
@@ -180,10 +195,17 @@ class ChainTree(Tree):
         self.root.set_label(f"[{MUTED}]chain {chain.name}[/{MUTED}]")
         self.root.data = None
         for ri, fragment in enumerate(chain.roots):
-            adrift = f" [{DIM}]· adrift[/{DIM}]" if ri > 0 else ""
+            adrift = ""
+            if fragment.adrift_since is not None:
+                adrift = (
+                    f" [{DIM}]· adrift {age_text(fragment.adrift_since)}[/{DIM}]"
+                )
+            elif ri > 0:
+                adrift = f" [{DIM}]· adrift[/{DIM}]"
             node = self.root.add(
                 system_label(fragment, here=chain.location == [ri],
-                             kinfo=self.session.kspace.get(fragment.name))
+                             kinfo=self.session.kspace.get(fragment.name),
+                             pilots=self._fleet(fragment.name))
                 + adrift,
                 data=("system", [ri]),
             )
@@ -213,7 +235,8 @@ class ChainTree(Tree):
             child_path = path + [sig.prefix]
             child_node = sig_node.add(
                 system_label(conn.child, here=chain.location == child_path,
-                             kinfo=self.session.kspace.get(conn.child.name)),
+                             kinfo=self.session.kspace.get(conn.child.name),
+                             pilots=self._fleet(conn.child.name)),
                 data=("system", child_path),
             )
             self._fill(child_node, conn.child, child_path,
