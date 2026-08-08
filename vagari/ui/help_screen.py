@@ -47,7 +47,7 @@ _HELP_TEXT = """\
              far side; other end wears K162
   [bold]sever abc[/bold]  collapsed hole → far side becomes
              an adrift fragment (kept, not lost)
-  [bold]fragment [name][/bold] file an unattached fragment
+  [bold]fragment \[name][/bold] file an unattached fragment
   [bold]cull[/bold]       strike holes past book lifetime
              (mapped children sever, not vanish)
   [bold]c[/bold] / [bold]copy[/bold]   chain as text to clipboard
