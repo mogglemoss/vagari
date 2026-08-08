@@ -64,6 +64,22 @@ def test_rekey_rejects_collisions(session):
     assert "REFUSED" in session.execute("rekey zzz abc")
 
 
+def test_rekey_from_inside_the_hole(session):
+    """Field-reported: after filing a K162 you are standing INSIDE it —
+    the placeholder lives one hole up, and the location path must follow
+    the rename."""
+    session.follow("J100744")
+    session.file_k162()                      # ZAA → J100744, we are inside
+    assert session.chain.location == ["ZAA"]
+    msg = session.execute("zaa = kdx")       # no `up` required
+    assert "refiled as KDX" in msg
+    assert session.chain.location == ["KDX"]
+    assert session.chain.current().name == "J100744"  # path still resolves
+    parent = session.chain.root
+    assert parent.find_connection("KDX").child.name == "J100744"
+    assert parent.find_sig("ZAA") is None
+
+
 def test_rekey_absorbs_scanned_real_sig(session):
     """The common flow: file a K162, then paste — the real sig appears as its
     own row; rekey absorbs the placeholder into the scanned record."""

@@ -435,14 +435,27 @@ class Session:
         and everything mapped behind it."""
         if not _PREFIX.match(new):
             raise ChainError(f"{new!r} is not a signature prefix")
-        here = self.chain.current()
-        sig = here.find_sig(old)
+        # The natural moment to refile a placeholder is from INSIDE the hole
+        # you just filed — so look in the current system first, then one up.
+        candidates = [self.chain.current()]
+        if self.chain.location:
+            candidates.append(self.chain.system_at(self.chain.location[:-1]))
+        here = sig = None
+        for system in candidates:
+            found = system.find_sig(old)
+            if found is not None:
+                here, sig = system, found
+                break
         if sig is None:
-            raise ChainError(f"no signature {old.upper()[:3]!r} in {here.name}")
+            raise ChainError(
+                f"no signature {old.upper()[:3]!r} in "
+                f"{' or '.join(s.name for s in candidates)}"
+            )
         new_prefix = new.upper()[:3]
         old_prefix = sig.prefix
         conn = here.find_connection(old_prefix)
         target = here.find_sig(new_prefix)
+
         if target is not None:
             # The real signature is already on file (pasted after scanning):
             # absorb the placeholder into it. The scanned record keeps its
@@ -461,20 +474,28 @@ class Session:
             target.group = SigGroup.WORMHOLE
             if sig.label and sig.label != "K162 (unscanned)":
                 target.label = target.label or sig.label
-            if conn is not None:
-                conn.sig_prefix = new_prefix
-            self._commit()
-            return (
+            message = (
                 f"{old_prefix} absorbed into {new_prefix} — the placeholder "
                 "is struck, the connection stands."
             )
-        sig.sig_id = f"{new_prefix}-000"
-        if sig.label == "K162 (unscanned)":
-            sig.label = ""
+        else:
+            sig.sig_id = f"{new_prefix}-000"
+            if sig.label == "K162 (unscanned)":
+                sig.label = ""
+            message = f"{old_prefix} refiled as {new_prefix}. The record forgives."
+
         if conn is not None:
             conn.sig_prefix = new_prefix
+        if (
+            self.chain.location
+            and self.chain.location[-1] == old_prefix
+            and len(candidates) > 1
+            and here is candidates[1]
+        ):
+            # We are standing inside this very hole; the path follows the rename.
+            self.chain.location[-1] = new_prefix
         self._commit()
-        return f"{old_prefix} refiled as {new_prefix}. The record forgives."
+        return message
 
     def _cull(self, force: bool = False) -> str:
         """Strike connections past their book lifetime (EXPIRED in the tree)."""
