@@ -48,9 +48,9 @@ AUSPEX · RETROSPEX · PANTOSCOPE · PERISCOPE[/#7a756e]
 
 [#3a3530]─────────────────────────────────────────[/#3a3530]
 
-[#7a756e]MIT licensed. Not affiliated with CCP
-Games. EVE Online is the property of
-CCP hf. ACTA PUBLICA · BONUM PUBLICUM.[/#7a756e]\
+[#7a756e]MIT licensed. Not affiliated with Fenris
+Creations. EVE Online is the property of
+Fenris Creations. ACTA PUBLICA · BONUM PUBLICUM.[/#7a756e]\
 """
 
 

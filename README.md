@@ -39,7 +39,7 @@ THE BUREAU IS MERELY NOTING.
 
 Every deposit also reports which signatures have despawned; press `s` (or submit `sweep`) to strike them from the record. A wormhole with mapped systems behind it is never struck by a sweep. The Bureau does not shred files that other files refer to.
 
-**The map follows you.** VAGARI tails your EVE chat logs (locally; CCP writes them precisely so tools may read them — enable "Log chat to file" in EVE's settings) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Multiboxing is understood: every client's log is watched, each tagged with its pilot, and the Bureau follows the first pilot who actually jumps — the one being flown, not the one spamming Jita local. `pilot` reports the roster; `pilot <name>` locks to a character (`VAGARI_PILOT` env for a standing order); `pilot off` releases. Arrive somewhere unmapped and the Bureau notes the discrepancy and offers you a form: press `k` and the arrival is filed as a K162 with a placeholder signature, destination class, statics, and weather already annotated. Relabel it when you scan the real sig. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
+**The map follows you.** VAGARI tails your EVE chat logs (locally; Fenris Creations writes them precisely so tools may read them — enable "Log chat to file" in EVE's settings) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Multiboxing is understood: every client's log is watched, each tagged with its pilot, and the Bureau follows the first pilot who actually jumps — the one being flown, not the one spamming Jita local. `pilot` reports the roster; `pilot <name>` locks to a character (`VAGARI_PILOT` env for a standing order); `pilot off` releases. Arrive somewhere unmapped and the Bureau notes the discrepancy and offers you a form: press `k` and the arrival is filed as a K162 with a placeholder signature, destination class, statics, and weather already annotated. Relabel it when you scan the real sig. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
 
 **Wormholes carry countdowns.** Type a hole (`abc H296`) and it knows its target class, mass, size, and book lifetime. The tree shows an upper-bound countdown — `≤13h04m` — amber when waning, and `EXPIRED?` when the paperwork has outlived the physics. Mark end-of-life in one key and the four-hour clock runs from that moment — two hours later the badge honestly reads `≤2h`. The bound is honest: it counts from when *you* first mapped the hole, which is the only fact the Bureau actually possesses.
 
@@ -198,7 +198,7 @@ MIT — see [LICENSE](LICENSE)
 
 ---
 
-*Built with [Textual](https://textual.textualize.io). Uses the [EVE Online ESI API](https://esi.evetech.net). Not affiliated with or endorsed by CCP Games. EVE Online and all related marks are the intellectual property of CCP hf.*
+*Built with [Textual](https://textual.textualize.io). Uses the [EVE Online ESI API](https://esi.evetech.net). Not affiliated with or endorsed by Fenris Creations. EVE Online and all related marks are the intellectual property of Fenris Creations (formerly CCP hf.).*
 
 ---
 
