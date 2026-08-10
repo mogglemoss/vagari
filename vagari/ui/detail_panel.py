@@ -113,12 +113,14 @@ class DetailPanel(Static):
         lines.append("")
         if system.sigs:
             lines.append(f"[{MUTED}]SIGNATURES ({len(system.sigs)})[/{MUTED}]")
+            spec = "/".join(str(p) for p in (path or [0]))
             for sig in system.sigs:
                 name = sig.label or sig.name or "—"
                 pct = f"{sig.signal:>3.0f}%"
                 flag = "!" if sig.flagged else " "
                 lines.append(
-                    f"[{TEXT}]{sig.prefix}[/{TEXT}]{flag}"
+                    f"[{TEXT}][@click=app.select_at('{spec}', '{sig.prefix}')]"
+                    f"{sig.prefix}[/][/{TEXT}]{flag}"
                     f"[{MUTED}]{pct} {sig.group.value:<12} {name}[/{MUTED}]"
                 )
         else:
@@ -177,7 +179,7 @@ class DetailPanel(Static):
         verdict = classify_site(sig.group, sig.name)
         if verdict is not None:
             lines.append("")
-            badge_color = RUST if verdict.hazard else WARN
+            badge_color = RUST if verdict.hazard else TEXT
             lines.append(
                 f"[bold {badge_color}]{verdict.label}[/bold {badge_color}] "
                 f"[{MUTED}]{verdict.note}[/{MUTED}]"
@@ -206,9 +208,12 @@ class DetailPanel(Static):
                     life = f" · {t.lifetime_hours:g}h" if t.lifetime_hours else ""
                     color = TEXT if marker else MUTED
                     lines.append(
-                        f"  [{color}]{t.code} → {t.target_display}"
-                        f"{life}{marker}[/{color}]"
+                        f"  [{color}][@click=app.set_selected_type('{t.code}')]"
+                        f"{t.code} → {t.target_display}{life}{marker}[/][/{color}]"
                     )
+                lines.append(
+                    f"  [{DIM}](click a candidate to type this hole)[/{DIM}]"
+                )
                 if len(candidates) > 9:
                     lines.append(f"  [{MUTED}]… and {len(candidates) - 9} more[/{MUTED}]")
         if conn is not None:

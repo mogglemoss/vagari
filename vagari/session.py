@@ -152,22 +152,9 @@ class Session:
                 sig.flagged = True
             self._commit()
             return f"Flagged: {' '.join(p.upper()[:3] for p in rest)}."
-        if head in ("del", "del!") and rest:
-            removed = []
-            for prefix in rest:
-                path, system, sig = self._locate(prefix, at)
-                system.remove_sig(prefix, force=head == "del!")
-                lp = len(path)
-                if (
-                    self.chain.location[:lp] == path
-                    and len(self.chain.location) > lp
-                    and self.chain.location[lp] == sig.prefix
-                ):
-                    # We were inside the deleted branch; fall back to its origin.
-                    self.chain.location = list(path)
-                removed.append(sig.prefix)
-            self._commit()
-            return f"Struck from record: {' '.join(removed)}."
+        if head in ("strike", "strike!", "del", "del!") and rest:
+            return self._strike(rest, at, force=head.endswith("!"),
+                                sig_only=head.startswith("del"))
         if head == "eol" and rest:
             return self._eol(rest[0], at)
         if head == "crit" and rest:
@@ -196,7 +183,7 @@ class Session:
         if head == "fragment":
             return self._fragment(" ".join(rest) if rest else None)
         if head in ("discard", "discard!") and rest:
-            return self._discard(rest[0], force=head == "discard!")
+            return self._discard(" ".join(rest), force=head == "discard!")
         if _PREFIX.match(head) and rest:
             return self._sig_command(head, rest, at)
         return f"Unrecognised submission: {raw!r}. See `?` for accepted forms."
@@ -376,6 +363,38 @@ class Session:
         self.pending_arrival = None
         self._commit()
         return f"{name} filed as fragment #{len(self.chain.roots)} — ◉ YOU placed there."
+
+    def _strike(self, args: list[str], at: str | None,
+                force: bool = False, sig_only: bool = False) -> str:
+        """One strike verb: each argument is a signature prefix, a fragment
+        #number, or a fragment name — resolved in that order."""
+        results = []
+        for arg in args:
+            if not sig_only:
+                if arg.lstrip("#").isdigit():
+                    results.append(self._discard(arg, force=force))
+                    continue
+            try:
+                path, system, sig = self._locate(arg, at)
+            except ChainError as sig_err:
+                if sig_only:
+                    raise
+                try:
+                    results.append(self._discard(arg, force=force))
+                    continue
+                except ChainError:
+                    raise sig_err from None
+            system.remove_sig(arg, force=force)
+            lp = len(path)
+            if (
+                self.chain.location[:lp] == path
+                and len(self.chain.location) > lp
+                and self.chain.location[lp] == sig.prefix
+            ):
+                self.chain.location = list(path)
+            results.append(f"{sig.prefix} struck from the record.")
+        self._commit()
+        return " ".join(results)
 
     def _discard(self, which: str, force: bool = False) -> str:
         """Strike an entire fragment, by number (as displayed) or by name."""

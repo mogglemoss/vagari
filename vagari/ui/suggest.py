@@ -9,13 +9,10 @@ from __future__ import annotations
 
 from textual.suggester import Suggester
 
+from vagari.commands import first_words
 from vagari.parsers.catalog import load_wormhole_types
 
-_COMMANDS = [
-    "nav", "up", "top", "sweep", "cull", "copy", "undo", "redo",
-    "return", "rekey", "here", "chain", "pilot", "recon", "intel",
-    "flag", "del", "eol", "crit", "k162", "full", "paths", "gas",
-]
+_COMMANDS = first_words() + ["redo", "full", "paths", "sites", "gas", "combat"]
 
 
 class BureauSuggester(Suggester):

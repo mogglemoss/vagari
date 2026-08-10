@@ -36,15 +36,17 @@ def age_text(since: datetime, now: datetime | None = None) -> str:
 
 
 def _visible(sig: Signature, view: str) -> bool:
-    """Themed views keep wormholes so the chain skeleton stays legible."""
+    """Themed views hide unopened wormhole sigs; OPENED wormholes always
+    render — child systems hang from them, so they are structure, not noise.
+    (That structural rendering happens in _fill, independent of this.)"""
     if view == "paths":
         return sig.group is SigGroup.WORMHOLE
     if view == "sites":
-        return sig.group in (SigGroup.WORMHOLE, SigGroup.RELIC, SigGroup.DATA)
+        return sig.group in (SigGroup.RELIC, SigGroup.DATA)
     if view == "gas":
-        return sig.group in (SigGroup.WORMHOLE, SigGroup.GAS)
+        return sig.group is SigGroup.GAS
     if view == "combat":
-        return sig.group in (SigGroup.WORMHOLE, SigGroup.COMBAT)
+        return sig.group is SigGroup.COMBAT
     return True
 
 
@@ -177,8 +179,14 @@ class ChainTree(Tree):
 
         node = walk(self.root)
         if node is not None:
-            self.move_cursor(node)
-            self.scroll_to_node(node)
+            def apply() -> None:
+                self.move_cursor(node)
+                self.scroll_to_node(node)
+
+            apply()
+            # Freshly rebuilt nodes may not have layout lines yet; re-apply
+            # once the next refresh has assigned them.
+            self.call_after_refresh(apply)
             return True
         return False
 
@@ -188,9 +196,32 @@ class ChainTree(Tree):
             if s == system_name and p != self.session.pilot_lock
         )
 
+    @staticmethod
+    def _key(data) -> tuple | None:
+        if data is None:
+            return None
+        if data[0] == "system":
+            return ("system", tuple(data[1]))
+        return ("sig", tuple(data[1]), data[2])
+
+    def _collapsed_keys(self) -> set:
+        collapsed = set()
+
+        def walk(node) -> None:
+            if node.children and not node.is_expanded:
+                key = self._key(node.data)
+                if key is not None:
+                    collapsed.add(key)
+            for child in node.children:
+                walk(child)
+
+        walk(self.root)
+        return collapsed
+
     def rebuild(self) -> None:
         chain = self.session.chain
         cursor_data = self.cursor_node.data if self.cursor_node else None
+        collapsed = self._collapsed_keys()
         self.clear()
         self.root.set_label(f"[{MUTED}]chain {chain.name}[/{MUTED}]")
         self.root.data = None
@@ -213,6 +244,14 @@ class ChainTree(Tree):
             )
             self._fill(node, fragment, [ri])
         self.root.expand_all()
+        if collapsed:
+            def restore(node) -> None:
+                if self._key(node.data) in collapsed:
+                    node.collapse()
+                for child in node.children:
+                    restore(child)
+
+            restore(self.root)
         if cursor_data is not None:
             self._restore_cursor(cursor_data)
 

@@ -98,18 +98,98 @@ async def test_candidate_types_for_untyped_hole(tmp_path):
 
 @pytest.mark.asyncio
 async def test_five_views(tmp_path):
+    """Themed views: structural (opened) wormholes stay, unopened ones hide."""
     app = make_app(tmp_path)
     async with app.run_test() as pilot:
         await paste(app, pilot, "paste_mixed.txt")
-        await pilot.press("3")  # sites: relic/data (+ wormholes)
+        # Open QLM so it becomes structure; add an unopened hole too.
+        app.session.execute("qlm J154535")
+        app.session.ingest(
+            "UNO-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU"
+        )
+        app.refresh_all()
+
+        await pilot.press("3")  # sites: relic/data only, plus structure
         await pilot.pause()
         text = tree_text(app.query_one(ChainTree))
-        assert "FIY" in text and "QLM" in text and "VMX" not in text
+        assert "FIY" in text and "VMX" not in text
+        assert "QLM" in text        # opened → structural, always shown
+        assert "UNO" not in text    # unopened wormhole → hidden in themed views
+
         await pilot.press("4")  # gas
         await pilot.pause()
         text = tree_text(app.query_one(ChainTree))
-        assert "VMX" in text and "FIY" not in text
-        await pilot.press("5")  # combat (fixture has none: wormholes only)
+        assert "VMX" in text and "FIY" not in text and "UNO" not in text
+
+        await pilot.press("2")  # paths: ALL wormholes, opened or not
         await pilot.pause()
         text = tree_text(app.query_one(ChainTree))
-        assert "QLM" in text and "VMX" not in text and "FIY" not in text
+        assert "QLM" in text and "UNO" in text and "FIY" not in text
+
+        # The view is announced in the pane title.
+        assert "PATHS VIEW" in str(app.query_one(ChainTree).border_title)
+
+
+@pytest.mark.asyncio
+async def test_collapse_state_survives_refresh(tmp_path):
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.session.execute("qlm J154535")
+        app.refresh_all()
+        await pilot.pause()
+        tree = app.query_one(ChainTree)
+        # Collapse the QLM branch, then force a refresh (the 60s tick path).
+        assert tree.move_to_data(("sig", [0], "QLM"))
+        qlm_node = tree.cursor_node
+        qlm_node.collapse()
+        assert not qlm_node.is_expanded
+        app.refresh_all()
+        await pilot.pause()
+        assert tree.move_to_data(("sig", [0], "QLM"))
+        assert not tree.cursor_node.is_expanded  # collapse survived
+
+
+@pytest.mark.asyncio
+async def test_candidate_types_clickable_and_set_type(tmp_path):
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("sig", [0], "QLM"))
+        assert "@click=app.set_selected_type(" in str(panel.content)
+
+        tree = app.query_one(ChainTree)
+        assert tree.move_to_data(("sig", [0], "QLM"))
+        app.action_set_selected_type("Z060")  # J105443's static
+        await pilot.pause()
+        conn = app.session.chain.root.find_connection("QLM")
+        assert conn is not None and conn.wh_type == "Z060"
+
+
+@pytest.mark.asyncio
+async def test_dossier_sig_rows_select(tmp_path):
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("system", [0]))
+        assert "@click=app.select_at(" in str(panel.content)
+        app.action_select_at("0", "FIY")
+        await pilot.pause()
+        assert app.query_one(ChainTree).cursor_node.data == ("sig", [0], "FIY")
+
+
+@pytest.mark.asyncio
+async def test_palette_chain_search_jumps(tmp_path):
+    from vagari.ui.palette import ChainSearchProvider
+
+    app = make_app(tmp_path)
+    assert ChainSearchProvider in app.COMMANDS
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.session.execute("qlm J154535")
+        app.refresh_all()
+        app.jump_to_data(("system", [0, "QLM"]))
+        await pilot.pause()
+        assert app.query_one(ChainTree).cursor_node.data == ("system", [0, "QLM"])

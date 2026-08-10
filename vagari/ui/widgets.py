@@ -41,9 +41,19 @@ class VagariHeader(Horizontal):
         width: 1fr;
         height: 3;
     }
+    #header-title-row {
+        height: 1;
+    }
     #header-title {
+        width: 1fr;
         height: 1;
         content-align: left middle;
+    }
+    #header-clock {
+        width: 11;
+        height: 1;
+        color: #7a756e;
+        content-align: right middle;
     }
     #header-breadcrumb {
         height: 1;
@@ -64,11 +74,13 @@ class VagariHeader(Horizontal):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="header-titles"):
-            yield Static(
-                "[bold #C15F3C]VAGARI[/bold #C15F3C] "
-                "[#7a756e]· ANOIKIS CARTOGRAPHIC BUREAU · Chain Custody Instrument[/#7a756e]",
-                id="header-title",
-            )
+            with Horizontal(id="header-title-row"):
+                yield Static(
+                    "[bold #C15F3C]VAGARI[/bold #C15F3C] "
+                    "[#7a756e]· ANOIKIS CARTOGRAPHIC BUREAU · Chain Custody Instrument[/#7a756e]",
+                    id="header-title",
+                )
+                yield Static("", id="header-clock")
             yield Static("", id="header-breadcrumb")
             yield Static("", id="header-status")
         yield Static(_mascot(_ESCA_FRAMES[0]), id="header-mascot")
@@ -76,6 +88,16 @@ class VagariHeader(Horizontal):
     def on_mount(self) -> None:
         self._esca_frame = 0
         self.set_interval(0.55, self._tick_esca)
+        self._tick_clock()
+        self.set_interval(10, self._tick_clock)
+
+    def _tick_clock(self) -> None:
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        self.query_one("#header-clock", Static).update(
+            f"[#7a756e]EVE {now:%H:%M}[/#7a756e]"
+        )
 
     def update_state(
         self,
@@ -97,12 +119,14 @@ class VagariHeader(Horizontal):
             # Sticky until filed or superseded — the status line is transient
             # and auto-recon used to bury this prompt.
             badges.append(
-                f"[bold #C15F3C]UNMAPPED: {pending_arrival} — press k to file[/bold #C15F3C]"
+                f"[bold #C15F3C][@click=app.file_k162]UNMAPPED: "
+                f"{pending_arrival} — press k or click to file[/][/bold #C15F3C]"
             )
         if despawned:
             names = " ".join(despawned)
             badges.append(
-                f"[bold #d4a017]DESPAWNED: {names} — press s to sweep[/bold #d4a017]"
+                f"[bold #d4a017][@click=app.sweep]DESPAWNED: {names} — "
+                f"press s or click to sweep[/][/bold #d4a017]"
             )
         if follow_active and pilot is None and not pending_arrival:
             # Cold start with no lock: without this, an idle multibox fleet

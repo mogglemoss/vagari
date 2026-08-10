@@ -98,7 +98,7 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | Submission | Effect |
 |------------|--------|
 | *paste* | deposit scan telemetry (implicit add) |
-| `sweep` | strike reported despawns (`s` from the map) |
+| `sweep` / `cull` | batch strikes: reported despawns · holes past book lifetime |
 | `nav abc` | proceed through wormhole ABC |
 | `up` / `top` | return toward / to the root |
 | `abc J105443` | open ABC to a catalogued system (class, statics, weather) |
@@ -107,11 +107,11 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `return abc [TYPE]` | pair ABC with its system's inbound hole (+true type read there) |
 | `sever abc` | collapsed hole: far side becomes an adrift fragment |
 | `fragment [name]` | file a disconnected fragment (or a pending arrival) |
-| `discard N\|name` | strike a fragment whole — by #number or name; `d` on its header (`discard!` forces) |
+| `strike vard` / `strike #2` | strike a fragment whole — by name or #number; `d` on its header |
 | `copy route` | homeward route to the clipboard |
 | `… @system` | address a sig elsewhere in the chain (else: current, then unique) |
 | `here <name>` | name the current system |
-| `flag abc` / `del abc` | flag · strike (`del!` forces) |
+| `flag abc` / `strike abc` | flag · strike a sig (`strike!` forces; `del` is an alias) |
 | `eol abc` / `crit abc` | toggle end-of-life · cycle mass state |
 | `k162` | file a pending unmapped arrival |
 | `chain <name>` | switch chain of custody |

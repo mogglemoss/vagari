@@ -1,6 +1,9 @@
-"""Help overlay, Ministry voice."""
+"""The instrument reference — generated from the command registry so the
+help, the palette, and the suggester can never drift apart."""
 
 from __future__ import annotations
+
+import textwrap
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -8,91 +11,91 @@ from textual.binding import Binding
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
-_HELP_TEXT = r"""
-[bold #C15F3C]ANOIKIS CARTOGRAPHIC BUREAU[/bold #C15F3C]  [#7a756e]instrument reference[/#7a756e]
+from vagari.commands import CATEGORIES, REGISTRY
 
-[#3a3530]── how to drive it ──────────────────────[/#3a3530]
-  [#e8e6e3]Paste scan telemetry any time the map
-  has focus — no mode, no prompt.[/#e8e6e3]
-  [#e8e6e3]Bold single keys act on the map.
-  [bold]Tab[/bold] or [bold]:[/bold] moves to the submission line
-  ([bold]nav qlm[/bold], [bold]htx J105443[/bold], …). [bold]Enter[/bold] files
-  it; [bold]Esc[/bold] or [bold]Tab[/bold] returns to the map.[/#e8e6e3]
+_RUST = "#C15F3C"
+_MUTED = "#7a756e"
+_TEXT = "#e8e6e3"
+_LINE = "#3a3530"
 
-[#3a3530]── deposits ─────────────────────────────[/#3a3530]
-  [italic]paste[/italic]      deposit scan telemetry; despawn
-             candidates are reported every time
-  [bold]s[/bold] / [bold]sweep[/bold]  strike reported despawns
+_GRAMMAR_WIDTH = 18
+_HELP_WIDTH = 30
 
-[#3a3530]── navigation ───────────────────────────[/#3a3530]
-  [bold]nav abc[/bold]    proceed through wormhole ABC
-  [bold]up[/bold] / [bold]u[/bold]     return toward the root
-  [bold]top[/bold] / [bold]g[/bold]    return to the root
-  [bold]Enter[/bold]      proceed into selected wormhole
+_PROSE = {
+    "drive": (
+        f"  [{_TEXT}]Paste scan telemetry any time the map\n"
+        f"  has focus — no mode, no prompt.\n"
+        f"  Bold keys act on the map. [bold]Tab[/bold] or [bold]:[/bold]\n"
+        f"  moves to the submission line; [bold]Enter[/bold]\n"
+        f"  files it; [bold]Esc[/bold] or [bold]Tab[/bold] returns. [bold]→[/bold]\n"
+        f"  accepts the ghost suggestion.\n"
+        f"  Click selects · double-click proceeds ·\n"
+        f"  dossier links act on the selection.[/{_TEXT}]"
+    ),
+    "follow": (
+        f"  [{_MUTED}]jump in-game and ◉ YOU follows via your\n"
+        f"  chatlogs; fleetmates appear as ◎ Name[/{_MUTED}]"
+    ),
+}
 
-[#3a3530]── the record ───────────────────────────[/#3a3530]
-  [bold]abc J105443[/bold]   open ABC to a catalogued system
-  [bold]abc H296[/bold]      type wormhole ABC (class, life)
-  [bold]abc <words>[/bold]   label a signature
-  [bold]return abc[/bold]    abc is the way home (pairs with
-             the hole its system was entered by)
-  [bold]… @system[/bold]    address a sig in a named system;
-             otherwise: current first, then unique
-  [bold]here <name>[/bold]   name the current system
-  [bold]flag abc[/bold] / [bold]x[/bold] flag · [bold]del abc[/bold] / [bold]d[/bold] strike
-  [bold]eol abc[/bold] / [bold]e[/bold]  toggle end-of-life
-  [bold]crit abc[/bold] / [bold]m[/bold] cycle mass state
-  [bold]zaa = abc[/bold]  refile a placeholder's real sig
-  [bold]return ina B274[/bold] optional type read on the
-             far side; other end wears K162
-  [bold]sever abc[/bold]  collapsed hole → far side becomes
-             an adrift fragment (kept, not lost)
-  [bold]fragment \[name][/bold] file an unattached fragment
-  [bold]discard N[/bold]  strike a fragment whole, by its
-             #number or name ([bold]d[/bold] on its header)
-  [bold]cull[/bold]       strike holes past book lifetime
-             (mapped children sever, not vanish)
-  [bold]c[/bold] / [bold]copy[/bold]   chain as text to clipboard
+_LEGEND = (
+    f"  [{_RUST}]○[/{_RUST}] wormhole   [{_MUTED}]▸ combat  ◇ data  ◈ relic[/{_MUTED}]\n"
+    f"  [{_MUTED}]≈ gas  ▪ ore  · unresolved  ![/{_MUTED}] flagged"
+)
 
-[#3a3530]── the legend ───────────────────────────[/#3a3530]
-  [#C15F3C]○[/#C15F3C] wormhole   [#7a756e]▸ combat  ◇ data  ◈ relic[/#7a756e]
-  [#7a756e]≈ gas  ▪ ore  · unresolved  ![/#7a756e] flagged
 
-[#3a3530]── finding things ───────────────────────[/#3a3530]
-  [bold]/query[/bold]     find a system, sig, or label
-             (repeat to cycle the matches)
-  [bold]intel[/bold]      zKill dossier for this system
-  [#7a756e]k-space exits gain sec + region on file
-  automatically once named[/#7a756e]
+def _escape(text: str) -> str:
+    """Literal brackets in grammar ('fragment [name]') must not be tags."""
+    return text.replace("[", "\\[")
 
-[#3a3530]── the mouse ────────────────────────────[/#3a3530]
-  [#e8e6e3]click selects · double-click proceeds
-  the dossier panel's [bold]nav eol mass flag
-  strike return[/bold] links act on the selection
-  → accepts the typed suggestion[/#e8e6e3]
 
-[#3a3530]── views & custody ──────────────────────[/#3a3530]
-  [bold]1[/bold]–[bold]5[/bold]      all / paths / sites / gas / combat
-  [bold]y[/bold]        cursor to ◉ YOU
-  [bold]h[/bold] / [bold]home[/bold]   the route home, door by door
-  [bold]copy route[/bold] homeward route to clipboard
-  [bold]z[/bold] / [bold]Z[/bold]      undo / redo (unbounded)
-  [bold]chain <name>[/bold] switch chain of custody
-  [bold]recon[/bold]      refresh system activity (ESI)
-  [bold]pilot[/bold]      who is followed · [bold]pilot <name>[/bold] lock
-             [bold]pilot off[/bold] → first pilot to jump wins
+def _entry_lines(grammar: str, keys: str, help_text: str) -> list[str]:
+    head = _escape(grammar)
+    help_text = _escape(help_text)
+    if keys:
+        head += f" · {keys}"
+    wrapped = textwrap.wrap(help_text, _HELP_WIDTH) or [""]
+    pad = " " * (_GRAMMAR_WIDTH + 2)
+    lines = []
+    if len(head) <= _GRAMMAR_WIDTH:
+        lines.append(
+            f"  [bold]{head:<{_GRAMMAR_WIDTH}}[/bold] "
+            f"[{_MUTED}]{wrapped[0]}[/{_MUTED}]"
+        )
+        rest = wrapped[1:]
+    else:
+        lines.append(f"  [bold]{head}[/bold]")
+        rest = wrapped
+    for w in rest:
+        lines.append(f"{pad}[{_MUTED}]{w}[/{_MUTED}]")
+    return lines
 
-[#3a3530]── follow-me ────────────────────────────[/#3a3530]
-  [#7a756e]jump in-game and ◉ YOU follows via chatlog[/#7a756e]
-  [bold]k[/bold] / [bold]k162[/bold]   file an unmapped arrival as K162
-  [bold]:[/bold]        focus the submission line
-  [bold]?[/bold]        show / close this reference
-  [bold]a[/bold]        about — the instrument's papers
-  [bold]q[/bold]        quit
 
-[#7a756e]THE BUREAU MAKES NO REPRESENTATIONS REGARDING
-THE ACCURACY OF THIS REFERENCE. FORM ACB-99.[/#7a756e]\
-"""
+def build_reference() -> str:
+    out = [
+        f"[bold {_RUST}]ANOIKIS CARTOGRAPHIC BUREAU[/bold {_RUST}]"
+        f"  [{_MUTED}]instrument reference[/{_MUTED}]",
+    ]
+    for key, title in CATEGORIES:
+        out.append("")
+        rule = "─" * (40 - len(title))
+        out.append(f"[{_LINE}]── {title} {rule}[/{_LINE}]")
+        if key in _PROSE:
+            out.append(_PROSE[key])
+        for c in REGISTRY:
+            if c.category != key:
+                continue
+            out.extend(_entry_lines(c.grammar, c.keys, c.help))
+        if key == "record":
+            out.append("")
+            out.append(f"[{_LINE}]── the legend ─────────────────────────[/{_LINE}]")
+            out.append(_LEGEND)
+    out.append("")
+    out.append(
+        f"[{_MUTED}]THE BUREAU MAKES NO REPRESENTATIONS REGARDING\n"
+        f"THE ACCURACY OF THIS REFERENCE. FORM ACB-99.[/{_MUTED}]"
+    )
+    return "\n".join(out)
 
 
 class HelpScreen(ModalScreen):
@@ -108,12 +111,13 @@ class HelpScreen(ModalScreen):
         background: #1a1815 60%;
     }
     #help-box {
-        width: 56;
+        width: 58;
         height: auto;
         max-height: 90%;
         padding: 1 2;
         background: #201d18;
         border: round #3a3530;
+        border-title-color: #C15F3C;
         overflow-y: auto;
     }
     """
@@ -121,4 +125,6 @@ class HelpScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         # Rich markup (not Textual Content markup): preserves the space runs
         # that column-align this reference sheet.
-        yield Static(Text.from_markup(_HELP_TEXT), id="help-box")
+        box = Static(Text.from_markup(build_reference()), id="help-box")
+        box.border_title = "FORM ACB-99"
+        yield box

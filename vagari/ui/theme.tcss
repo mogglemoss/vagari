@@ -22,6 +22,16 @@ Footer {
     height: 1fr;
 }
 
+#chain-tree, #detail-panel {
+    border: round $warm-border;
+    border-title-color: $warm-muted;
+    border-title-style: bold;
+}
+#chain-tree:focus, #detail-panel:focus {
+    border: round $rust;
+    border-title-color: $rust;
+}
+
 #chain-tree {
     width: 3fr;
     padding: 0 1;
@@ -135,4 +145,14 @@ Tree > .tree--guides-selected {
     scrollbar-background-hover: $warm-bg;
     scrollbar-color-active: $rust;
     scrollbar-background-active: $warm-bg;
+}
+
+/* Watchtower pulse: the map's frame runs hot for a moment. */
+#chain-tree.alerting {
+    border: heavy #d4a017;
+}
+
+Toast {
+    background: $warm-panel;
+    border: round #d4a017;
 }

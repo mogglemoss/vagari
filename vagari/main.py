@@ -44,6 +44,7 @@ BRAND = "ANOIKIS CARTOGRAPHIC BUREAU"
 
 class MapperApp(App):
     TITLE = "VAGARI"
+    COMMANDS = App.COMMANDS | {__import__('vagari.ui.palette', fromlist=['ChainSearchProvider']).ChainSearchProvider}
     SUB_TITLE = f"{BRAND} · Chain Custody Instrument · Capsuleer Edition"
     CSS_PATH = "ui/theme.tcss"
 
@@ -88,74 +89,42 @@ class MapperApp(App):
         self._search: tuple[str, int] | None = None  # (query, match index)
 
     def get_system_commands(self, screen):
-        """Curated Bureau commands for the palette (Ctrl+P) — replaces
-        Textual's defaults (theme switching would undermine the Ministry)."""
-        yield SystemCommand(
-            "Reference", "Show the instrument reference (?)", self.action_show_help
-        )
-        yield SystemCommand(
-            "Sweep despawned",
-            "Strike reported despawns from the record",
-            lambda: self._after_engine(self.session.execute("sweep")),
-        )
-        yield SystemCommand(
-            "Recon: refresh activity",
-            "One ESI request; last-hour kills per system",
-            lambda: self.run_worker(
+        """The palette is generated from the command registry — same truth
+        as the reference screen and the suggester. Textual's defaults are
+        replaced (theme switching would undermine the Ministry)."""
+        from vagari.commands import REGISTRY
+
+        special = {
+            "sweep": self.action_sweep,
+            "cull": lambda: self._after_engine(self.session.execute("cull")),
+            "recon": lambda: self.run_worker(
                 self._refresh_activity(), exclusive=True, group="recon"
             ),
-        )
-        yield SystemCommand(
-            "File K162", "File a pending unmapped arrival", self.action_file_k162
-        )
-        yield SystemCommand("Undo", "Revert one revision", self.action_undo)
-        yield SystemCommand("Redo", "Reinstate one revision", self.action_redo)
-        yield SystemCommand(
-            "View: full", "All signatures", lambda: self.action_set_view("full")
-        )
-        yield SystemCommand(
-            "View: paths", "Wormholes only", lambda: self.action_set_view("paths")
-        )
-        yield SystemCommand(
-            "View: sites", "Wormholes, relic/data/ghost",
-            lambda: self.action_set_view("sites")
-        )
-        yield SystemCommand(
-            "View: gas", "Wormholes and gas", lambda: self.action_set_view("gas")
-        )
-        yield SystemCommand(
-            "View: combat", "Wormholes and combat sites",
-            lambda: self.action_set_view("combat")
-        )
-        yield SystemCommand(
-            "Return to root", "Move ◉ YOU to the top of the chain", self.action_go_top
-        )
-        yield SystemCommand(
-            "Homeward", "Show the route home, door by door",
-            self.action_show_homeward,
-        )
-        yield SystemCommand(
-            "Copy route", "Homeward route to the clipboard",
-            self.action_copy_route,
-        )
-        yield SystemCommand(
-            "Copy chain", "Plain-text tree to the clipboard", self.action_copy_chain
-        )
-        yield SystemCommand(
-            "Find", "Search systems, sigs, and labels", self.action_start_search
-        )
-        yield SystemCommand(
-            "Intel: zKill dossier", "Killboard stats for the current system",
-            self._request_intel,
-        )
-        yield SystemCommand(
-            "Cull expired", "Strike holes past their book lifetime",
-            lambda: self._after_engine(self.session.execute("cull")),
-        )
-        yield SystemCommand(
-            "About", "The instrument's papers", self.action_show_about
-        )
-        yield SystemCommand("Quit", "Close the instrument", self.action_quit)
+            "request_intel": self._request_intel,
+        }
+        for c in REGISTRY:
+            if not c.palette:
+                continue
+            fn = special.get(c.action) or getattr(
+                self, f"action_{c.action}", None
+            )
+            if fn is None:
+                continue
+            desc = c.help + (f"  ·  key: {c.keys}" if c.keys else "")
+            yield SystemCommand(c.palette, desc, fn)
+        yield SystemCommand("Redo", "reinstate one revision  ·  key: Z",
+                            self.action_redo)
+        yield SystemCommand("Copy route", "homeward route to the clipboard",
+                            self.action_copy_route)
+        for view, blurb in [
+            ("full", "all signatures"), ("paths", "wormholes only"),
+            ("sites", "wormholes, relic/data/ghost"),
+            ("gas", "wormholes and gas"), ("combat", "wormholes and combat"),
+        ]:
+            yield SystemCommand(
+                f"View: {view}", blurb,
+                lambda v=view: self.action_set_view(v),
+            )
 
     def compose(self) -> ComposeResult:
         yield VagariHeader(id="app-header")
@@ -235,10 +204,14 @@ class MapperApp(App):
         alerts = self.session.sample_activity()
         if alerts:
             self.query_one(VagariHeader).flare()
-            self.status(
-                "WATCHTOWER: activity in " + "; ".join(alerts)
-                + ". The Bureau is merely noting. Loudly."
-            )
+            message = "WATCHTOWER: activity in " + "; ".join(alerts)
+            self.status(message + ". The Bureau is merely noting. Loudly.")
+            # Danger is the one thing that earns a toast and a pulse.
+            self.notify(message, title="WATCHTOWER", severity="warning",
+                        timeout=8)
+            tree = self.query_one(ChainTree)
+            tree.add_class("alerting")
+            self.set_timer(2.0, lambda: tree.remove_class("alerting"))
         node = self.query_one(ChainTree).cursor_node
         self.query_one(DetailPanel).show_node(node.data if node else None)
         self.status(f"Reconnaissance filed: activity for {len(activity)} systems.")
@@ -248,6 +221,12 @@ class MapperApp(App):
     def refresh_all(self) -> None:
         tree = self.query_one(ChainTree)
         tree.rebuild()
+        view = self.session.view
+        tree.border_title = (
+            "THE CHAIN" if view == "full" else f"THE CHAIN · {view.upper()} VIEW"
+        )
+        self.query_one(DetailPanel).border_title = "DOSSIER"
+
         self.query_one(VagariHeader).update_state(
             self.session.chain.name,
             self.session.breadcrumb(),
@@ -329,7 +308,9 @@ class MapperApp(App):
     # -- tree selection ------------------------------------------------------
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
-        self.query_one(DetailPanel).show_node(event.node.data)
+        panels = self.query(DetailPanel)
+        if panels:  # guard: highlight events can fire during teardown
+            panels.first().show_node(event.node.data)
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         tree = self.query_one(ChainTree)
@@ -456,6 +437,25 @@ class MapperApp(App):
 
     def action_show_homeward(self) -> None:
         self.status(self.session.homeward())
+
+    def jump_to_data(self, data: tuple) -> None:
+        """Palette hit: move the map cursor to a system or signature."""
+        self.query_one(ChainTree).move_to_data(data)
+
+    def action_set_selected_type(self, code: str) -> None:
+        """Dossier link: type the selected wormhole with a candidate code."""
+        sel = self._selected_sig()
+        if sel is None:
+            self.status("Select a signature first. The Bureau requires specificity.")
+            return
+        _path, prefix = sel
+        self._after_engine(self.session.execute(f"{prefix} {code}"))
+
+    def action_select_at(self, spec: str, prefix: str) -> None:
+        """Dossier link: move the map cursor to a signature row."""
+        parts = spec.split("/")
+        path = [int(parts[0])] + parts[1:]
+        self.query_one(ChainTree).move_to_data(("sig", path, prefix))
 
     def action_snap_to_you(self) -> None:
         tree = self.query_one(ChainTree)
