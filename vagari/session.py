@@ -71,6 +71,46 @@ class Session:
         (self.store.amend if amend else self.store.commit)(self.chain)
         self.dirty = True
 
+    def orientation_hint(self) -> str | None:
+        """The first-session ladder: three hints, each earned by doing the
+        previous thing, then silence forever. Veterans with existing chains
+        graduate immediately."""
+        stage = self.store.load_orientation()
+        if stage >= 3:
+            return None
+
+        def any_sigs() -> bool:
+            return any(r.sigs or r.connections for r in self.chain.roots)
+
+        def any_conns() -> bool:
+            def walk(sys) -> bool:
+                return bool(sys.connections) or any(
+                    walk(c.child) for c in sys.connections
+                )
+            return any(walk(r) for r in self.chain.roots)
+
+        if stage == 0:
+            if any_sigs():
+                self.store.save_orientation(1)
+                return self.orientation_hint()
+            return (
+                "FORM ACB-00 (ORIENTATION): deposit a probe scan — Ctrl+A, "
+                "Ctrl+C in the scanner window, then paste here."
+            )
+        if stage == 1:
+            if any_conns():
+                self.store.save_orientation(2)
+                return self.orientation_hint()
+            return (
+                "ORIENTATION 2/3: select a wormhole — its candidate types "
+                "are in the dossier. Click one, or submit `abc H296`."
+            )
+        self.store.save_orientation(3)
+        return (
+            "ORIENTATION 3/3: jump it in game — the map follows you. "
+            "`?` holds the full reference. The Bureau is done teaching."
+        )
+
     # -- paste ingestion -----------------------------------------------------
 
     def ingest(self, text: str) -> str:

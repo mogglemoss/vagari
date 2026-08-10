@@ -53,6 +53,8 @@ Every deposit also reports which signatures have despawned; press `s` (or submit
 
 **The map is a forest.** Chains fragment — that is what wormholes do. When a hole collapses (`sever abc`, or automatically when a swept or culled hole has mapped systems behind it), everything on the far side becomes an *adrift fragment*: kept, navigable, follow-me-aware, marked `· adrift` at top level. `fragment [name]` files a disconnected start (nomads begin anywhere); scanning a hole whose destination matches an adrift fragment reattaches it whole. K162 is understood as an *end*, not a type: `abc K162` files an entrance someone opened into you (its true type reads from the far side), and `return ina B274` pairs the far-side sig with the hole you came through while recording the true type from whichever side you read it.
 
+**It teaches itself once.** A fresh install walks you through the first session in three status-line hints — deposit, type a hole, jump — each earned by doing the previous one, then never seen again. FORM ACB-00 (ORIENTATION) is filed exactly once.
+
 **Everything is undoable.** Every mutation is a snapshot; `z` and `Z` walk the record backward and forward without limit of consequence. Multiple chains of custody are maintained with `chain <name>`. The Bureau has never lost a chain. The Bureau has, on occasion, misplaced a pilot.
 
 ---

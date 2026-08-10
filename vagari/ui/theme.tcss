@@ -156,3 +156,28 @@ Toast {
     background: $warm-panel;
     border: round #d4a017;
 }
+
+/* Dossier widgets */
+#dossier-body {
+    height: auto;
+}
+#dossier-eol {
+    height: 3;
+    color: #d4a017;
+    margin: 0 0 0 1;
+}
+#dossier-trend {
+    height: 1;
+    margin: 0 1;
+}
+#dossier-trend > .sparkline--max-color {
+    color: #d4a017;
+}
+#dossier-trend > .sparkline--min-color {
+    color: #3a3530;
+}
+#dossier-sigs {
+    height: auto;
+    max-height: 14;
+    margin: 1 0 0 0;
+}

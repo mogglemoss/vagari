@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from textual.widgets import Static
+from textual.app import ComposeResult
+from textual.containers import VerticalScroll
+from textual.widgets import DataTable, Digits, Sparkline, Static
 
 from vagari.model.chain import System
 from vagari.model.lifetime import LifeStatus, assess, hours_text
@@ -31,18 +33,49 @@ THE ANOIKIS CARTOGRAPHIC BUREAU MAKES NO
 REPRESENTATIONS REGARDING THE PERSISTENCE
 OF SPACETIME.
 
-EVERYTHING BELOW OBSERVES; NOTHING BELOW
+EVERYTHING HERE OBSERVES; NOTHING HERE
 JUDGES. THE BUREAU IS MERELY NOTING.[/{MUTED}]"""
 
 
-class DetailPanel(Static):
+class DetailPanel(VerticalScroll):
+    """The dossier: a markup body plus real widgets — a sortable signature
+    table, a native sparkline for the activity trend, and a Digits readout
+    for an EOL countdown."""
+
     def __init__(self, session: Session, **kwargs) -> None:
-        super().__init__(EMPTY_STATE, **kwargs)
+        super().__init__(**kwargs)
         self.session = session
+        self.table_path: list = [0]
+
+    def compose(self) -> ComposeResult:
+        yield Static(EMPTY_STATE, id="dossier-body")
+        yield Digits("", id="dossier-eol")
+        yield Sparkline([], id="dossier-trend")
+        yield DataTable(id="dossier-sigs")
+
+    def on_mount(self) -> None:
+        table = self.query_one("#dossier-sigs", DataTable)
+        table.add_columns("SIG", "%", "KIND", "NAME")
+        table.cursor_type = "row"
+        self._extras(False, False, False)
+
+    @property
+    def content(self):
+        """The markup body — kept for callers (and tests) that read text."""
+        return self.query_one("#dossier-body", Static).content
+
+    def update(self, markup: str) -> None:
+        self.query_one("#dossier-body", Static).update(markup)
+
+    def _extras(self, eol: bool, trend: bool, table: bool) -> None:
+        self.query_one("#dossier-eol").display = eol
+        self.query_one("#dossier-trend").display = trend
+        self.query_one("#dossier-sigs").display = table
 
     def show_node(self, data: tuple | None) -> None:
         if data is None:
             self.update(EMPTY_STATE)
+            self._extras(False, False, False)
             return
         if data[0] == "system":
             self._show_system(self.session.chain.system_at(data[1]), data[1])
@@ -103,37 +136,55 @@ class DetailPanel(Static):
                 )
             elif self.session.activity_fetched:
                 lines.append(f"[{MUTED}]ACTIVITY (last hour): none observed[/{MUTED}]")
+        history = []
+        if info is not None:
             history = self.session.activity_history.get(info.system_id, [])
             if len(history) >= 2:
-                trend_color = WARN if history[-1] > 0 else MUTED
-                lines.append(
-                    f"[{MUTED}]TREND (PvP, per recon):[/{MUTED}] "
-                    f"[{trend_color}]{spark(history)}[/{trend_color}]"
-                )
+                lines.append(f"[{MUTED}]TREND (PvP, per recon sweep):[/{MUTED}]")
         lines.append("")
         if system.sigs:
-            lines.append(f"[{MUTED}]SIGNATURES ({len(system.sigs)})[/{MUTED}]")
-            spec = "/".join(str(p) for p in (path or [0]))
-            for sig in system.sigs:
-                name = sig.label or sig.name or "—"
-                pct = f"{sig.signal:>3.0f}%"
-                flag = "!" if sig.flagged else " "
-                lines.append(
-                    f"[{TEXT}][@click=app.select_at('{spec}', '{sig.prefix}')]"
-                    f"{sig.prefix}[/][/{TEXT}]{flag}"
-                    f"[{MUTED}]{pct} {sig.group.value:<12} {name}[/{MUTED}]"
-                )
+            lines.append(
+                f"[{MUTED}]SIGNATURES ({len(system.sigs)}) — click a row "
+                f"to select[/{MUTED}]"
+            )
         else:
             lines.append(f"[{MUTED}]NO SIGNATURES ON RECORD.[/{MUTED}]")
         self.update("\n".join(lines))
+
+        from vagari.glyphs import kind_word
+
+        table = self.query_one("#dossier-sigs", DataTable)
+        table.clear()
+        self.table_path = list(path or [0])
+        for sig in system.sigs:
+            table.add_row(
+                sig.prefix + ("!" if sig.flagged else ""),
+                f"{sig.signal:.0f}",
+                kind_word(sig.group, sig.name),
+                sig.label or sig.name or "—",
+                key=sig.prefix,
+            )
+        if history:
+            self.query_one("#dossier-trend", Sparkline).data = history
+        self._extras(False, len(history) >= 2, bool(system.sigs))
 
     def _show_sig(self, path: list, prefix: str) -> None:
         system = self.session.chain.system_at(path)
         sig = system.find_sig(prefix)
         if sig is None:
             self.update(EMPTY_STATE)
+            self._extras(False, False, False)
             return
         conn = system.find_connection(prefix)
+        life = assess(conn) if conn is not None else None
+        show_eol = life is not None and life.remaining_hours is not None
+        if show_eol:
+            hours = int(life.remaining_hours)
+            minutes = int((life.remaining_hours - hours) * 60)
+            self.query_one("#dossier-eol", Digits).update(
+                f"{hours}:{minutes:02d}"
+            )
+        self._extras(show_eol, False, False)
 
         def link(label: str, action: str, color: str = MUTED) -> str:
             return f"[{color}][@click=app.{action}]{label}[/][/{color}]"
@@ -203,7 +254,14 @@ class DetailPanel(Static):
                     f"[{MUTED}]CANDIDATE TYPES for a hole in "
                     f"{system.name}:[/{MUTED}]"
                 )
-                for t in candidates[:9]:
+                for t in candidates[:10]:
+                    if t.code == "K162":
+                        lines.append(
+                            f"  [{TEXT}][@click=app.set_selected_type('K162')]"
+                            f"K162 — inbound; its true type reads from the "
+                            f"far side[/][/{TEXT}]"
+                        )
+                        continue
                     marker = " static" if t.code in static_codes else ""
                     life = f" · {t.lifetime_hours:g}h" if t.lifetime_hours else ""
                     color = TEXT if marker else MUTED

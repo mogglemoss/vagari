@@ -148,6 +148,9 @@ class MapperApp(App):
         # keystroke replaces the fzf-seeded character.
         self.query_one("#command-bar", Input).select_on_focus = False
         self.refresh_all()
+        hint = self.session.orientation_hint()
+        if hint:
+            self.status(hint)
         self.query_one(ChainTree).focus()
         if self.recon_enabled:
             self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
@@ -250,6 +253,9 @@ class MapperApp(App):
         self.query_one("#status-line", Static).update(message)
 
     def _after_engine(self, message: str) -> None:
+        hint = self.session.orientation_hint()
+        if hint:
+            message = f"{message}  ·  {hint}"
         self.status(message)
         if self.session.dirty:
             self.query_one(VagariHeader).flare()
@@ -312,6 +318,15 @@ class MapperApp(App):
         panels = self.query(DetailPanel)
         if panels:  # guard: highlight events can fire during teardown
             panels.first().show_node(event.node.data)
+
+    def on_data_table_row_selected(self, event) -> None:
+        """Dossier signature table: clicking a row selects it on the map."""
+        panel = self.query_one(DetailPanel)
+        prefix = event.row_key.value if event.row_key else None
+        if prefix:
+            self.query_one(ChainTree).move_to_data(
+                ("sig", list(panel.table_path), prefix)
+            )
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         tree = self.query_one(ChainTree)

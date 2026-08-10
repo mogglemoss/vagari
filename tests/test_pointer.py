@@ -94,6 +94,7 @@ async def test_candidate_types_for_untyped_hole(tmp_path):
         text = str(panel.content)
         assert "CANDIDATE TYPES" in text
         assert "static" in text  # the system's static is marked
+        assert "K162" in text and "inbound" in text  # the eternal candidate
 
 
 @pytest.mark.asyncio
@@ -168,14 +169,20 @@ async def test_candidate_types_clickable_and_set_type(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_dossier_sig_rows_select(tmp_path):
+async def test_dossier_sig_table_selects(tmp_path):
+    from textual.widgets import DataTable
+
     app = make_app(tmp_path)
     async with app.run_test() as pilot:
         await paste(app, pilot, "paste_mixed.txt")
         panel = app.query_one(DetailPanel)
         panel.show_node(("system", [0]))
-        assert "@click=app.select_at(" in str(panel.content)
-        app.action_select_at("0", "FIY")
+        await pilot.pause()
+        table = panel.query_one("#dossier-sigs", DataTable)
+        assert table.display and table.row_count == 4
+
+        table.move_cursor(row=2)  # FIY
+        table.action_select_cursor()
         await pilot.pause()
         assert app.query_one(ChainTree).cursor_node.data == ("sig", [0], "FIY")
 

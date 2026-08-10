@@ -158,7 +158,10 @@ def candidate_types(jcode: str) -> list[WormholeType]:
     if info is None:
         return []
     types = load_wormhole_types()
-    out = [types[code] for code in info.statics if code in types]
+    # Half of all unknown holes are somebody else's entrance: K162 is a
+    # standing candidate everywhere, ahead of the outbound possibilities.
+    out = [types["K162"]] if "K162" in types else []
+    out += [types[code] for code in info.statics if code in types]
     class_key = info.jclass.lower()
     for t in types.values():
         if t.code not in info.statics and class_key in t.source_classes:

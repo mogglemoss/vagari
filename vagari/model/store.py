@@ -163,6 +163,17 @@ class Store:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         (self.base_dir / "ACTIVE").write_text(name)
 
+    def load_orientation(self) -> int:
+        """0..2 = next hint due; 3 = oriented, never hint again."""
+        try:
+            return int((self.base_dir / "ORIENTED").read_text().strip())
+        except (OSError, ValueError):
+            return 0
+
+    def save_orientation(self, stage: int) -> None:
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        (self.base_dir / "ORIENTED").write_text(str(stage))
+
     def chains(self) -> list[str]:
         if not self.base_dir.exists():
             return []
