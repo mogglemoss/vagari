@@ -137,3 +137,32 @@ def test_export_lists_fragments(session):
     text = export_text(session.chain)
     assert "fragment #2, adrift" in text
     assert "J154535" in text
+
+
+def test_adopt_kspace_fragment_by_name(session):
+    session.execute("fragment Vard")
+    session.chain.location = [0]
+    session.ingest("SYQ-001\tCosmic Signature\tWormhole\t\t80.0%\t1 AU")
+    msg = session.execute("syq vard")
+    assert "reattached" in msg
+    conn = session.chain.root.find_connection("SYQ")
+    assert conn is not None and conn.child.name == "Vard"
+    assert conn.child.adrift_since is None
+    assert len(session.chain.roots) == 1
+    # A single token that matches nothing still labels, as before.
+    session.ingest("LBL-001\tCosmic Signature\tGas Site\t\t50.0%\t1 AU")
+    session.execute("lbl mine")
+    assert session.chain.root.find_sig("LBL").label == "mine"
+
+
+def test_flying_into_fragment_reattaches(session):
+    session.execute("fragment J141150")
+    session.chain.location = [0]
+    session.ingest("HUV-001\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t1 AU")
+    session.execute("huv U210")            # HUV → "?"
+    msg = session.follow("J141150")        # jump: arrival IS the fragment
+    assert "reattached" in msg and "HUV" in msg
+    assert len(session.chain.roots) == 1
+    conn = session.chain.root.find_connection("HUV")
+    assert conn.child.name == "J141150"
+    assert session.chain.current().name == "J141150"

@@ -453,6 +453,14 @@ class Session:
         wh_type = lookup_wh_type(arg)
         if wh_type is not None and len(rest) == 1:
             return self._set_wh_type(prefix, wh_type.code, at)
+        if len(rest) == 1:
+            # A single token naming an adrift fragment adopts it — k-space
+            # fragments (Vard, Knophtikoo) reattach as readily as J-codes.
+            for ri, root in enumerate(self.chain.roots):
+                if root.name.lower() == arg.lower():
+                    path, system, _sig = self._locate(prefix, at)
+                    if system.find_connection(prefix) is None:
+                        return self._adopt_fragment(system, path, prefix, ri)
         label = " ".join(rest)
         _, system, sig = self._locate(prefix, at)
         sig.label = label
@@ -610,6 +618,28 @@ class Session:
                 self._commit(amend=True)
                 return f"Followed you back up to {name}."
 
+        # An opened hole with an unknown destination: if exactly one exists,
+        # assume that is the one you took. When the arrival is an adrift
+        # fragment's ROOT, reattach the fragment whole — this outranks merely
+        # relocating the marker into it.
+        unknown = [c for c in current.connections if c.child.name == "?"]
+        if len(unknown) == 1:
+            conn = unknown[0]
+            for ri, root in enumerate(chain.roots):
+                if root.name.lower() == name.lower() and ri != chain.location[0]:
+                    conn.child = root
+                    root.adrift_since = None
+                    chain.roots.pop(ri)
+                    if chain.location[0] > ri:
+                        chain.location[0] -= 1
+                    chain.location.append(conn.sig_prefix)
+                    self.pending_arrival = None
+                    self._commit()
+                    return (
+                        f"Assumed you took {conn.sig_prefix} — fragment "
+                        f"{name} reattached; the record is whole again."
+                    )
+
         found = self._find_system(name)
         if found is not None:
             chain.location = found
@@ -617,11 +647,6 @@ class Session:
             self._commit(amend=True)
             return f"Relocated ◉ YOU to {name} (elsewhere in the chain)."
 
-        # An opened hole with an unknown destination: if exactly one exists,
-        # assume that is the one you took and name its far side — arriving
-        # through a mapped-but-unresolved wormhole must not spawn a duplicate
-        # sibling connection.
-        unknown = [c for c in current.connections if c.child.name == "?"]
         if len(unknown) == 1:
             conn = unknown[0]
             expected = conn.child.jclass
