@@ -196,12 +196,14 @@ class ChainTree(Tree):
         self.root.data = None
         for ri, fragment in enumerate(chain.roots):
             adrift = ""
+            if len(chain.roots) > 1:
+                adrift = f" [{DIM}]#{ri + 1}[/{DIM}]"
             if fragment.adrift_since is not None:
-                adrift = (
+                adrift += (
                     f" [{DIM}]· adrift {age_text(fragment.adrift_since)}[/{DIM}]"
                 )
             elif ri > 0:
-                adrift = f" [{DIM}]· adrift[/{DIM}]"
+                adrift += f" [{DIM}]· adrift[/{DIM}]"
             node = self.root.add(
                 system_label(fragment, here=chain.location == [ri],
                              kinfo=self.session.kspace.get(fragment.name),

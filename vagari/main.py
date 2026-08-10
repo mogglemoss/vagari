@@ -494,6 +494,18 @@ class MapperApp(App):
         self.refresh_all()  # show LAZY ARMED in header
 
     def action_sig_cmd(self, cmd: str) -> None:
+        # `d` on a fragment header discards the fragment itself.
+        if cmd == "del":
+            node = self.query_one(ChainTree).cursor_node
+            if (
+                node is not None
+                and node.data is not None
+                and node.data[0] == "system"
+                and len(node.data[1]) == 1
+            ):
+                ri = node.data[1][0]
+                self._after_engine(self.session.execute(f"discard {ri + 1}"))
+                return
         selected = self._selected_sig()
         if selected is None:
             self.status("Select a signature first. The Bureau requires specificity.")

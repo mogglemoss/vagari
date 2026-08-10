@@ -377,14 +377,24 @@ class Session:
         self._commit()
         return f"{name} filed as fragment #{len(self.chain.roots)} — ◉ YOU placed there."
 
-    def _discard(self, number: str, force: bool = False) -> str:
-        """Strike an entire adrift fragment (1-based, as displayed)."""
+    def _discard(self, which: str, force: bool = False) -> str:
+        """Strike an entire fragment, by number (as displayed) or by name."""
+        ri: int | None = None
         try:
-            ri = int(number.lstrip("#")) - 1
+            ri = int(which.lstrip("#")) - 1
         except ValueError:
-            raise ChainError(f"{number!r} is not a fragment number") from None
-        if not 0 <= ri < len(self.chain.roots):
-            raise ChainError(f"no fragment #{number.lstrip('#')} on this chain")
+            wanted = which.lower()
+            hits = [
+                i for i, r in enumerate(self.chain.roots)
+                if r.name.lower() == wanted or r.name.lower().startswith(wanted)
+            ]
+            if len(hits) > 1:
+                names = ", ".join(self.chain.roots[i].name for i in hits)
+                raise ChainError(f"ambiguous: {names}") from None
+            if hits:
+                ri = hits[0]
+        if ri is None or not 0 <= ri < len(self.chain.roots):
+            raise ChainError(f"no fragment {which!r} on this chain")
         if len(self.chain.roots) == 1:
             raise ChainError("this is the only fragment — the map must map something")
         if self.chain.location[0] == ri:

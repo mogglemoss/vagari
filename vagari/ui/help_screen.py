@@ -48,7 +48,8 @@ _HELP_TEXT = r"""
   [bold]sever abc[/bold]  collapsed hole → far side becomes
              an adrift fragment (kept, not lost)
   [bold]fragment \[name][/bold] file an unattached fragment
-  [bold]discard N[/bold]  strike adrift fragment N whole
+  [bold]discard N[/bold]  strike a fragment whole, by its
+             #number or name ([bold]d[/bold] on its header)
   [bold]cull[/bold]       strike holes past book lifetime
              (mapped children sever, not vanish)
   [bold]c[/bold] / [bold]copy[/bold]   chain as text to clipboard

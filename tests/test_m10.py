@@ -143,3 +143,34 @@ def test_adrift_age_stamped(session):
     session.execute("new J154535")   # adoption clears the stamp
     conn = session.chain.root.find_connection("NEW")
     assert conn.child.adrift_since is None
+
+
+def test_discard_by_name(session):
+    session.execute("fragment Knophtikoo")
+    session.chain.location = [0]
+    assert "struck" in session.execute("discard knop")
+    session.execute("fragment J100744")
+    session.execute("fragment J164417")
+    session.chain.location = [0]
+    # Ambiguous prefixes refuse with candidates; exact numbers still work.
+    assert "no fragment" in session.execute("discard nope")
+    assert "struck" in session.execute("discard j100744")
+
+
+@pytest.mark.asyncio
+async def test_d_key_discards_selected_fragment(tmp_path):
+    from tests.test_app import make_app, paste
+    from vagari.ui.chain_tree import ChainTree
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.session.execute("fragment J100744")
+        app.session.chain.location = [0]
+        app.refresh_all()
+        await pilot.pause()
+        tree = app.query_one(ChainTree)
+        assert tree.move_to_data(("system", [1]))
+        await pilot.press("d")
+        await pilot.pause()
+        assert len(app.session.chain.roots) == 1

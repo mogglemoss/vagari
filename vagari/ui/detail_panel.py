@@ -45,12 +45,18 @@ class DetailPanel(Static):
             self.update(EMPTY_STATE)
             return
         if data[0] == "system":
-            self._show_system(self.session.chain.system_at(data[1]))
+            self._show_system(self.session.chain.system_at(data[1]), data[1])
         else:
             self._show_sig(data[1], data[2])
 
-    def _show_system(self, system: System) -> None:
+    def _show_system(self, system: System, path: list | None = None) -> None:
         lines = [f"[bold {RUST}]{system.name}[/bold {RUST}]"]
+        if path is not None and len(path) == 1 and len(self.session.chain.roots) > 1:
+            n = path[0] + 1
+            lines.append(
+                f"[{MUTED}]fragment #{n} · "
+                f"[@click=app.sig_cmd('del')]discard[/][/{MUTED}]"
+            )
         if system.jclass:
             statics = f" · statics {system.statics}" if system.statics else ""
             lines.append(f"[{TEXT}]{system.jclass}{statics}[/{TEXT}]")
