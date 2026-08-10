@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     tags: ["v*"]
+    branches: ["main"]   # catch frozen-build breaks early; release stays tag-gated
   workflow_dispatch:
 
 jobs:

@@ -17,6 +17,24 @@ Footer {
     background: $warm-surface;
     color: $warm-muted;
 }
+FooterKey {
+    background: $warm-surface;
+    color: $warm-muted;
+}
+FooterKey:hover {
+    background: $rust 30%;
+    color: $warm-text;
+}
+FooterKey > .footer-key--key {
+    color: #d4a017;
+    background: $warm-surface;
+}
+FooterKey:hover > .footer-key--key {
+    background: $rust 30%;
+}
+FooterKey > .footer-key--description {
+    color: $warm-muted;
+}
 
 #body {
     height: 1fr;
@@ -175,7 +193,19 @@ Tree > .tree--guides-selected {
 
 Toast {
     background: $warm-panel;
+    border: round $warm-border;
+}
+Toast.-information {
+    border: round $warm-muted;
+}
+Toast.-warning {
     border: round #d4a017;
+}
+Toast.-error {
+    border: round $rust;
+}
+Toast .toast--title {
+    color: $warm-text;
 }
 
 /* Dossier widgets */
