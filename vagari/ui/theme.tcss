@@ -33,6 +33,11 @@ Footer {
 }
 
 #chain-tree {
+    scrollbar-color: #2f2b26;          /* faint rail, not a grey bar */
+    scrollbar-color-hover: #C15F3C;
+    scrollbar-color-active: #C15F3C;
+    scrollbar-background: transparent;
+
     width: 3fr;
     padding: 0 1;
     background: $warm-bg;
@@ -139,6 +144,8 @@ Tree > .tree--guides-selected {
 
 /* Warm scrollbars — Textual defaults to blue */
 * {
+    scrollbar-size-horizontal: 1;
+    scrollbar-size-vertical: 1;
     scrollbar-color: #5a5550;
     scrollbar-background: $warm-bg;
     scrollbar-color-hover: $rust;
@@ -209,4 +216,5 @@ DataTable > .datatable--odd-row {
     height: auto;
     max-height: 14;
     margin: 1 0 0 0;
+    scrollbar-size-horizontal: 0;  /* names are truncated; no bar needed */
 }

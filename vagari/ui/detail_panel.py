@@ -157,11 +157,14 @@ class DetailPanel(VerticalScroll):
         table.clear()
         self.table_path = list(path or [0])
         for sig in system.sigs:
+            name = sig.label or sig.name or "—"
+            if len(name) > 22:  # full name is one click away, in the sig view
+                name = name[:21] + "…"
             table.add_row(
                 sig.prefix + ("!" if sig.flagged else ""),
                 f"{sig.signal:.0f}",
                 kind_word(sig.group, sig.name),
-                sig.label or sig.name or "—",
+                name,
                 key=sig.prefix,
             )
         if history:
