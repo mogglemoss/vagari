@@ -10,6 +10,10 @@ jobs:
   # ── Linux ────────────────────────────────────────────────────────────────
   build-linux:
     runs-on: ubuntu-latest
+    # A version-bump push always arrives with its tag; let the tag's
+    # run do the work and skip the duplicate branch run.
+    if: github.ref_type == 'tag' || !startsWith(github.event.head_commit.message || '', 'Bump version')
+
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
@@ -28,6 +32,10 @@ jobs:
   # ── Windows ──────────────────────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
+    # A version-bump push always arrives with its tag; let the tag's
+    # run do the work and skip the duplicate branch run.
+    if: github.ref_type == 'tag' || !startsWith(github.event.head_commit.message || '', 'Bump version')
+
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
@@ -47,6 +55,10 @@ jobs:
   # ── macOS universal binary (Intel + Apple Silicon) ───────────────────────
   build-macos:
     runs-on: macos-latest
+    # A version-bump push always arrives with its tag; let the tag's
+    # run do the work and skip the duplicate branch run.
+    if: github.ref_type == 'tag' || !startsWith(github.event.head_commit.message || '', 'Bump version')
+
     env:
       VAGARI_UNIVERSAL2: "1"
     steps:
