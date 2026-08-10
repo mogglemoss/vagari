@@ -20,6 +20,7 @@ from vagari.ui.about_screen import AboutScreen
 from vagari.ui.chain_tree import ChainTree
 from vagari.ui.detail_panel import DetailPanel
 from vagari.ui.help_screen import HelpScreen
+from vagari.ui.palette import ChainSearchProvider
 from vagari.ui.suggest import BureauSuggester
 from vagari.ui.widgets import VagariHeader
 
@@ -44,7 +45,7 @@ BRAND = "ANOIKIS CARTOGRAPHIC BUREAU"
 
 class MapperApp(App):
     TITLE = "VAGARI"
-    COMMANDS = App.COMMANDS | {__import__('vagari.ui.palette', fromlist=['ChainSearchProvider']).ChainSearchProvider}
+    COMMANDS = App.COMMANDS | {ChainSearchProvider}
     SUB_TITLE = f"{BRAND} · Chain Custody Instrument · Capsuleer Edition"
     CSS_PATH = "ui/theme.tcss"
 
