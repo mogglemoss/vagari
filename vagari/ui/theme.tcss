@@ -176,6 +176,35 @@ Toast {
 #dossier-trend > .sparkline--min-color {
     color: #3a3530;
 }
+/* DataTable — de-blue every stateful part (ported from HARUSPEX). */
+DataTable {
+    background: transparent;
+    color: $warm-text;
+}
+DataTable > .datatable--header {
+    background: $warm-surface;
+    color: #a09890;
+    text-style: bold;
+}
+DataTable > .datatable--header-hover {
+    background: $warm-surface;
+    color: $rust;
+}
+DataTable > .datatable--cursor {
+    background: $rust 25%;
+    color: $warm-text;
+}
+DataTable > .datatable--hover {
+    background: $rust 12%;
+    color: $warm-text;
+}
+DataTable > .datatable--even-row {
+    background: #1e1b16;
+}
+DataTable > .datatable--odd-row {
+    background: transparent;
+}
+
 #dossier-sigs {
     height: auto;
     max-height: 14;
