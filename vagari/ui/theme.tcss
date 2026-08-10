@@ -109,6 +109,20 @@ CommandPalette OptionList > .option-list--option-hover {
     background: $warm-panel;
 }
 
+/* Action links (dossier verbs, candidate types, header badges):
+   hover must glow rust, never factory blue. Base link colors come from
+   the surrounding markup, so only the hover states are pinned here. */
+* {
+    link-background-hover: $rust 30%;
+    link-color-hover: $warm-text;
+    link-style-hover: bold;
+}
+
+/* Input text selection — same treatment. */
+#command-bar > .input--selection {
+    background: $rust 35%;
+}
+
 /* Kill the default blue focus ring everywhere */
 *:focus {
     border: round $warm-border;
