@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
-from textual.widgets import DataTable, Digits, Sparkline, Static
+from textual.widgets import DataTable, Digits, Input, Sparkline, Static
 
-from vagari.model.chain import System
+from vagari.model.chain import SigGroup, System, utcnow
 from vagari.model.lifetime import LifeStatus, assess, hours_text
 from vagari.parsers.catalog import lookup_system, lookup_wh_type
 from vagari.parsers.site_intel import classify_site, gas_contents
@@ -21,6 +21,10 @@ def human_mass(kg: float) -> str:
     if kg >= 1e6:
         return f"{kg / 1e6:.1f}M kg"
     return f"{kg:,.0f} kg"
+
+
+def _link(label: str, action: str, color: str = MUTED) -> str:
+    return f"[{color}][@click=app.{action}]{label}[/][/{color}]"
 
 
 EMPTY_STATE = f"""\
@@ -46,11 +50,13 @@ class DetailPanel(VerticalScroll):
         super().__init__(**kwargs)
         self.session = session
         self.table_path: list = [0]
+        self._form_wrap: tuple[str, str] | None = None
 
     def compose(self) -> ComposeResult:
         yield Static(EMPTY_STATE, id="dossier-body")
         yield Digits("", id="dossier-eol")
         yield Sparkline([], id="dossier-trend")
+        yield Input(id="dossier-form")
         yield DataTable(id="dossier-sigs")
 
     def on_mount(self) -> None:
@@ -67,10 +73,33 @@ class DetailPanel(VerticalScroll):
     def update(self, markup: str) -> None:
         self.query_one("#dossier-body", Static).update(markup)
 
-    def _extras(self, eol: bool, trend: bool, table: bool) -> None:
+    def _extras(
+        self, eol: bool, trend: bool, table: bool, form: bool = False
+    ) -> None:
         self.query_one("#dossier-eol").display = eol
         self.query_one("#dossier-trend").display = trend
         self.query_one("#dossier-sigs").display = table
+        self.query_one("#dossier-form").display = form
+        if not form:
+            self._form_wrap = None
+
+    def _arm_form(self, before: str, after: str, placeholder: str) -> None:
+        """Point the dossier's submission field at a filing: what the user
+        types is wrapped as `{before} {typed}{after}` and run through the
+        same front door as the command line."""
+        self._form_wrap = (before, after)
+        self.query_one("#dossier-form", Input).placeholder = placeholder
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id != "dossier-form":
+            return
+        event.stop()
+        value = event.value.strip()
+        event.input.value = ""
+        if not value or self._form_wrap is None:
+            return
+        before, after = self._form_wrap
+        self.app.submit_text(f"{before} {value}{after}".strip())
 
     def show_node(self, data: tuple | None) -> None:
         if data is None:
@@ -84,12 +113,24 @@ class DetailPanel(VerticalScroll):
 
     def _show_system(self, system: System, path: list | None = None) -> None:
         lines = [f"[bold {RUST}]{system.name}[/bold {RUST}]"]
-        if path is not None and len(path) == 1 and len(self.session.chain.roots) > 1:
+        is_root = path is not None and len(path) == 1
+        if is_root and len(self.session.chain.roots) > 1:
             n = path[0] + 1
             lines.append(
                 f"[{MUTED}]fragment #{n} · "
                 f"[@click=app.sig_cmd('del')]discard[/][/{MUTED}]"
             )
+        current = path is not None and list(path) == list(self.session.chain.location)
+        actions = []
+        if not current:
+            actions.append(_link("nav", "nav_selected", RUST))
+        if current:
+            actions.append(_link("recon", "run_cmd('recon')"))
+            actions.append(_link("intel", "run_cmd('intel')"))
+        if not is_root and system.name and not system.name.startswith("?"):
+            actions.append(_link("strike", f"run_cmd('strike {system.name}')"))
+        if actions:
+            lines.append(f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions))
         if system.jclass:
             statics = f" · statics {system.statics}" if system.statics else ""
             lines.append(f"[{TEXT}]{system.jclass}{statics}[/{TEXT}]")
@@ -109,11 +150,29 @@ class DetailPanel(VerticalScroll):
         if info is not None and zstats is None:
             zstats = self.session.zkill_stats.get(info.system_id)
         if zstats is not None:
-            lines.append(
-                f"[{MUTED}]ZKILL: {zstats.ships_destroyed:,} ships destroyed "
-                f"all-time · {zstats.active_characters} active hunters · "
-                f"{zstats.active_kills} recent kills[/{MUTED}]"
-            )
+            from vagari.enrichers.zkill import human_isk
+
+            if zstats.stats is not None:
+                s = zstats.stats
+                lines.append(
+                    f"[{MUTED}]ZKILL: {s.ships_destroyed:,} ships · "
+                    f"{human_isk(s.isk_destroyed)} ISK destroyed all-time[/{MUTED}]"
+                )
+                lines.append(
+                    f"[{MUTED}]ACTIVE: {s.active_characters} hunters · "
+                    f"{s.active_ships} hull types recently[/{MUTED}]"
+                )
+            if zstats.last_kill is not None:
+                lk = zstats.last_kill
+                when = f"{age_text(lk.time)} ago" if lk.time else "recently"
+                color = WARN if lk.time and (
+                    (utcnow() - lk.time).total_seconds() < 3600
+                ) else MUTED
+                lines.append(
+                    f"[{color}]LAST KILL: {when} — {lk.ship_name}, "
+                    f"{lk.attackers} attacker{'s' if lk.attackers != 1 else ''}"
+                    f" · {human_isk(lk.isk)} ISK[/{color}]"
+                )
         if system.effect and info is not None:
             from vagari.parsers.catalog import effect_details
 
@@ -169,7 +228,13 @@ class DetailPanel(VerticalScroll):
             )
         if history:
             self.query_one("#dossier-trend", Sparkline).data = history
-        self._extras(False, len(history) >= 2, bool(system.sigs))
+        if current:
+            self._arm_form(
+                "here", "", f"here — name or correct {system.name}"
+            )
+        self._extras(
+            False, len(history) >= 2, bool(system.sigs), form=current
+        )
 
     def _show_sig(self, path: list, prefix: str) -> None:
         system = self.session.chain.system_at(path)
@@ -187,11 +252,19 @@ class DetailPanel(VerticalScroll):
             self.query_one("#dossier-eol", Digits).update(
                 f"{hours}:{minutes:02d}"
             )
-        self._extras(show_eol, False, False)
+        qualifier = (
+            f" @{system.name}"
+            if system.name and not system.name.startswith("?")
+            else ""
+        )
+        if sig.group is SigGroup.WORMHOLE:
+            hint = f"{sig.prefix} — type (K162 · H296) · destination (J105443) · label"
+        else:
+            hint = f"{sig.prefix} — label this signature, filed verbatim"
+        self._arm_form(sig.prefix.lower(), qualifier, hint)
+        self._extras(show_eol, False, False, form=True)
 
-        def link(label: str, action: str, color: str = MUTED) -> str:
-            return f"[{color}][@click=app.{action}]{label}[/][/{color}]"
-
+        link = _link
         actions = []
         if conn is not None:
             actions.append(link("nav", "nav_selected", RUST))
@@ -201,6 +274,8 @@ class DetailPanel(VerticalScroll):
             link("flag", "sig_cmd('flag')"),
             link("strike", "sig_cmd('del')"),
         ]
+        if conn is not None:
+            actions.append(link("sever", "sig_cmd('sever')"))
         if conn is None:
             actions.append(link("return", "return_selected"))
         action_row = f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions)
@@ -244,7 +319,6 @@ class DetailPanel(VerticalScroll):
             if clouds:
                 contents = " · ".join(f"{c.units:,} × {c.gas}" for c in clouds)
                 lines.append(f"[{TEXT}]{contents}[/{TEXT}]")
-        from vagari.model.chain import SigGroup
         from vagari.parsers.catalog import candidate_types
 
         if sig.group is SigGroup.WORMHOLE and (conn is None or not conn.wh_type):
@@ -273,7 +347,8 @@ class DetailPanel(VerticalScroll):
                         f"{t.code} → {t.target_display}{life}{marker}[/][/{color}]"
                     )
                 lines.append(
-                    f"  [{DIM}](click a candidate to type this hole)[/{DIM}]"
+                    f"  [{DIM}](click a candidate — or type any code, even a "
+                    f"rare one, in the field below)[/{DIM}]"
                 )
                 if len(candidates) > 9:
                     lines.append(f"  [{MUTED}]… and {len(candidates) - 9} more[/{MUTED}]")

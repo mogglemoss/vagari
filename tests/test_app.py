@@ -335,14 +335,26 @@ async def test_kspace_rendering(tmp_path):
         await pilot.pause()
         assert "0.9" in tree_text(app.query_one(ChainTree))
 
-        from vagari.enrichers.zkill import SystemKillStats
+        from datetime import timedelta
 
-        app.session.zkill_stats[30000142] = SystemKillStats(1_538_343, 795, 1354)
+        from vagari.enrichers.zkill import LastKill, SystemIntel, SystemKillStats
+        from vagari.model.chain import utcnow
+
+        app.session.zkill_stats[30000142] = SystemIntel(
+            stats=SystemKillStats(1_538_343, 177_408_739_338_859, 795, 210),
+            last_kill=LastKill(
+                time=utcnow() - timedelta(minutes=12),
+                ship_name="Capsule",
+                attackers=3,
+                isk=12_400_000.0,
+            ),
+        )
         panel = app.query_one(DetailPanel)
         panel.show_node(("system", [0, "ZAA"]))
         text = str(panel.content)
         assert "security 0.9" in text and "The Forge" in text
-        assert "1,538,343 ships destroyed" in text
+        assert "1,538,343 ships" in text and "177.4T" in text
+        assert "LAST KILL" in text and "Capsule" in text and "12.4M" in text
 
 
 @pytest.mark.asyncio

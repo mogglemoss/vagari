@@ -75,6 +75,8 @@ REGISTRY: list[Command] = [
             action="cull"),
     Command("", "… @system", "address a sig elsewhere; otherwise current "
             "system first, then unique anywhere", "record"),
+    Command("", "(the dossier)", "its filing field and action links accept "
+            "this same grammar, pre-addressed to the selection", "record"),
     # the forest
     Command("sever", "sever abc", "collapsed hole: far side becomes an "
             "adrift fragment, kept not lost", "forest"),

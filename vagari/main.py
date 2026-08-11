@@ -274,11 +274,17 @@ class MapperApp(App):
     # -- command bar ---------------------------------------------------------
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id != "command-bar":
+            return  # dossier forms handle their own submissions
         text = event.value.strip()
         event.input.value = ""
         self.query_one(ChainTree).focus()
-        if not text:
-            return
+        if text:
+            self.submit_text(text)
+
+    def submit_text(self, text: str) -> None:
+        """The front door for filings — the command bar, dossier action
+        links, and dossier forms all arrive here, identically."""
         if text in ("?", "help"):
             self.action_show_help()
             return
@@ -401,19 +407,26 @@ class MapperApp(App):
         self.run_worker(self._fetch_intel(current.name, system_id), group="intel")
 
     async def _fetch_intel(self, name: str, system_id: int) -> None:
-        from vagari.enrichers.zkill import fetch_system_stats
+        from vagari.enrichers.zkill import fetch_system_intel, human_isk
 
-        stats = await fetch_system_stats(system_id)
-        if stats is None:
+        intel = await fetch_system_intel(system_id)
+        if intel is None:
             self.status("zKillboard unavailable. The Bureau does not speculate offline.")
             return
-        self.session.zkill_stats[system_id] = stats
+        self.session.zkill_stats[system_id] = intel
         node = self.query_one(ChainTree).cursor_node
         self.query_one(DetailPanel).show_node(node.data if node else None)
-        self.status(
-            f"Intel filed for {name}: {stats.ships_destroyed:,} ships destroyed "
-            f"all-time · {stats.active_characters} recently active hunters."
-        )
+        bits = []
+        if intel.stats:
+            bits.append(
+                f"{intel.stats.ships_destroyed:,} ships · "
+                f"{human_isk(intel.stats.isk_destroyed)} ISK all-time"
+            )
+        if intel.last_kill and intel.last_kill.time:
+            from vagari.ui.chain_tree import age_text
+
+            bits.append(f"last kill {age_text(intel.last_kill.time)} ago")
+        self.status(f"Intel filed for {name}: " + " · ".join(bits) + ".")
 
     async def _resolve_kspace(self) -> None:
         from vagari.enrichers.kspace import resolve_systems
@@ -458,14 +471,28 @@ class MapperApp(App):
         """Palette hit: move the map cursor to a system or signature."""
         self.query_one(ChainTree).move_to_data(data)
 
+    def action_run_cmd(self, text: str) -> None:
+        """Dossier link: any filing the submission line accepts."""
+        self.submit_text(text)
+
+    def _qualifier(self, path: list) -> str:
+        """`@system` suffix so a filing lands on the selected sig even when
+        the cursor is parked far from ◉ YOU."""
+        name = self.session.chain.system_at(path).name
+        if name and not name.startswith("?"):
+            return f" @{name}"
+        return ""
+
     def action_set_selected_type(self, code: str) -> None:
         """Dossier link: type the selected wormhole with a candidate code."""
         sel = self._selected_sig()
         if sel is None:
             self.status("Select a signature first. The Bureau requires specificity.")
             return
-        _path, prefix = sel
-        self._after_engine(self.session.execute(f"{prefix} {code}"))
+        path, prefix = sel
+        self._after_engine(
+            self.session.execute(f"{prefix} {code}{self._qualifier(path)}")
+        )
 
     def action_select_at(self, spec: str, prefix: str) -> None:
         """Dossier link: move the map cursor to a signature row."""
@@ -527,12 +554,10 @@ class MapperApp(App):
             self.status("Select a signature first. The Bureau requires specificity.")
             return
         path, prefix = selected
-        if path != self.session.chain.location:
-            self.status(
-                "Selection lies outside the current system. Proceed there first (Enter)."
-            )
-            return
-        self._after_engine(self.session.execute(f"{cmd} {prefix}"))
+        qualifier = (
+            "" if path == self.session.chain.location else self._qualifier(path)
+        )
+        self._after_engine(self.session.execute(f"{cmd} {prefix}{qualifier}"))
 
 
 def main() -> None:

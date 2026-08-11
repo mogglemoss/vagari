@@ -227,6 +227,28 @@ Toast .toast--title {
 #dossier-trend > .sparkline--min-color {
     color: #3a3530;
 }
+#dossier-form {
+    height: 1;
+    background: $warm-panel;
+    border: none;
+    color: $warm-text;
+    margin: 1 1 0 1;
+    padding: 0 1;
+}
+#dossier-form:focus {
+    border: none;
+    background: $warm-surface;
+}
+#dossier-form > .input--cursor {
+    background: $rust;
+    color: $warm-bg;
+}
+#dossier-form > .input--placeholder {
+    color: $warm-muted;
+}
+#dossier-form > .input--selection {
+    background: $rust 35%;
+}
 /* DataTable — de-blue every stateful part (ported from HARUSPEX). */
 DataTable {
     background: transparent;

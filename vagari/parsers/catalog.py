@@ -152,18 +152,13 @@ def effect_details(effect: str, class_key: str) -> list[tuple[str, str]] | None:
 
 
 def candidate_types(jcode: str) -> list[WormholeType]:
-    """Plausible outbound types for a J-space system: its statics, then
-    wanderers whose source classes include the system's class."""
+    """The short list that covers most holes: K162 (someone's entrance —
+    true half the time) plus this system's statics. Wanderers exist but a
+    long list buries the likely answers; type rare codes by hand."""
     info = lookup_system(jcode)
     if info is None:
         return []
     types = load_wormhole_types()
-    # Half of all unknown holes are somebody else's entrance: K162 is a
-    # standing candidate everywhere, ahead of the outbound possibilities.
     out = [types["K162"]] if "K162" in types else []
     out += [types[code] for code in info.statics if code in types]
-    class_key = info.jclass.lower()
-    for t in types.values():
-        if t.code not in info.statics and class_key in t.source_classes:
-            out.append(t)
     return out

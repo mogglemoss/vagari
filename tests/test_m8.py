@@ -77,16 +77,48 @@ def test_unresolved_kspace_names(session):
 def test_parse_system_stats():
     payload = {
         "shipsDestroyed": 1538343,
+        "iskDestroyed": 177408739338859,
         "activepvp": {
             "characters": {"type": "Characters", "count": 795},
-            "kills": {"type": "Total Kills", "count": 1354},
+            "ships": {"type": "Ships", "count": 210},
         },
     }
     stats = parse_system_stats(payload)
     assert stats == SystemKillStats(
-        ships_destroyed=1538343, active_characters=795, active_kills=1354
+        ships_destroyed=1538343,
+        isk_destroyed=177408739338859,
+        active_characters=795,
+        active_ships=210,
     )
-    assert parse_system_stats({}) == SystemKillStats(0, 0, 0)
+    assert parse_system_stats({}) == SystemKillStats(0, 0, 0, 0)
+
+
+def test_parse_last_kill():
+    from vagari.enrichers.zkill import LastKill, parse_last_kill
+
+    kills = [
+        {
+            "killmail_time": "2026-08-11T14:03:00Z",
+            "attackers": [{}, {}, {}],
+            "victim": {"ship_type_id": 670},
+            "zkb": {"totalValue": 12_400_000.0},
+        }
+    ]
+    lk = parse_last_kill(kills, ship_name="Capsule")
+    assert lk is not None
+    assert lk.ship_name == "Capsule"
+    assert lk.attackers == 3
+    assert lk.isk == 12_400_000.0
+    assert lk.time is not None and lk.time.hour == 14
+    assert parse_last_kill([]) is None
+
+
+def test_human_isk():
+    from vagari.enrichers.zkill import human_isk
+
+    assert human_isk(177408739338859) == "177.4T"
+    assert human_isk(12_400_000) == "12.4M"
+    assert human_isk(950) == "950"
 
 
 # -- log path ----------------------------------------------------------------

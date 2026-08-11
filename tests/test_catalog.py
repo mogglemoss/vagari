@@ -60,3 +60,15 @@ def test_wormhole_types():
     assert n110.lifetime_hours > 0
     assert n110.jump_mass > 0
     assert lookup_wh_type("XYZ9") is None
+
+
+def test_candidate_types_short_list():
+    """K162 first, then this system's statics — wanderers stay off the
+    list; rare codes are typed by hand in the dossier form."""
+    from vagari.parsers.catalog import candidate_types
+
+    codes = [t.code for t in candidate_types("J105443")]
+    assert codes[0] == "K162"
+    info = lookup_system("J105443")
+    assert codes[1:] == [c for c in info.statics if c in set(codes)]
+    assert set(codes) == {"K162", *info.statics}

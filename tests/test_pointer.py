@@ -200,3 +200,94 @@ async def test_palette_chain_search_jumps(tmp_path):
         app.jump_to_data(("system", [0, "QLM"]))
         await pilot.pause()
         assert app.query_one(ChainTree).cursor_node.data == ("system", [0, "QLM"])
+
+
+@pytest.mark.asyncio
+async def test_dossier_form_types_hole(tmp_path):
+    """The dossier's filing field: type a code by hand, even a rare one."""
+    from textual.widgets import Input
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("sig", [0], "QLM"))
+        await pilot.pause()
+        form = panel.query_one("#dossier-form", Input)
+        assert form.display
+        assert "type" in form.placeholder
+        form.focus()
+        await pilot.pause()
+        form.value = "H296"  # a wanderer — deliberately off the short list
+        await pilot.press("enter")
+        await pilot.pause()
+        conn = app.session.chain.root.find_connection("QLM")
+        assert conn is not None and conn.wh_type == "H296"
+
+
+@pytest.mark.asyncio
+async def test_dossier_form_labels_sig(tmp_path):
+    from textual.widgets import Input
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("sig", [0], "FIY"))
+        await pilot.pause()
+        form = panel.query_one("#dossier-form", Input)
+        assert form.display
+        form.focus()
+        await pilot.pause()
+        form.value = "pristine, save for last"
+        await pilot.press("enter")
+        await pilot.pause()
+        sig = app.session.chain.root.find_sig("FIY")
+        assert sig.label == "pristine, save for last"
+
+
+@pytest.mark.asyncio
+async def test_system_dossier_actions_and_here_form(tmp_path):
+    from textual.widgets import Input
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("system", [0]))  # ◉ YOU
+        await pilot.pause()
+        text = str(panel.content)
+        assert "@click=app.run_cmd('recon')" in text
+        assert "@click=app.run_cmd('intel')" in text
+        form = panel.query_one("#dossier-form", Input)
+        assert form.display and form.placeholder.startswith("here")
+
+        # A non-current system offers nav instead, and no naming form.
+        app.session.execute("qlm J154535")
+        app.refresh_all()
+        panel.show_node(("sig", [0], "QLM"))
+        await pilot.pause()
+        panel.show_node(("system", [0, "QLM"]))
+        await pilot.pause()
+        text = str(panel.content)
+        assert "@click=app.nav_selected" in text
+        assert "strike J154535" in text
+        assert not panel.query_one("#dossier-form", Input).display
+
+
+@pytest.mark.asyncio
+async def test_sig_cmd_qualifies_remote_selection(tmp_path):
+    """Action links work from anywhere — the filing is @-qualified, not
+    refused, when the cursor sits outside the current system."""
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.session.execute("qlm J154535")
+        app.session.execute("nav QLM")  # ◉ YOU moves off the root
+        app.refresh_all()
+        await pilot.pause()
+        tree = app.query_one(ChainTree)
+        assert tree.move_to_data(("sig", [0], "FIY"))  # back in the root
+        app.action_sig_cmd("flag")
+        await pilot.pause()
+        assert app.session.chain.root.find_sig("FIY").flagged
