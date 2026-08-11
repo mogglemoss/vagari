@@ -90,6 +90,7 @@ class MapperApp(App):
         self._search: tuple[str, int] | None = None  # (query, match index)
         self._intel_requested: set[int] = set()  # auto-inquiries this session
         self._intel_failed: set[int] = set()
+        self._kspace_attempted: set[str] = set()
 
     def get_system_commands(self, screen):
         """The palette is generated from the command registry — same truth
@@ -155,6 +156,7 @@ class MapperApp(App):
         self.query_one(ChainTree).move_to_data(
             ("system", list(self.session.chain.location))
         )
+        self.maybe_resolve_kspace()  # k-space exits need ids for intel
         hint = self.session.orientation_hint()
         if hint:
             self.status(hint)
@@ -468,6 +470,23 @@ class MapperApp(App):
             bits.append(f"last kill {age_text(intel.last_kill.time)} ago")
         self.status(f"Intel filed for {name}: " + " · ".join(bits) + ".")
 
+    def maybe_resolve_kspace(self) -> bool:
+        """Dossier hook: a k-space system needs its id before the killboard
+        can be asked. One attempt per name per session. True while an
+        identification is freshly out; False when it already came back
+        empty (a name no chart knows) or recon is off."""
+        if not self.recon_enabled:
+            return False
+        names = set(self.session.unresolved_kspace_names())
+        if names - self._kspace_attempted:
+            self._kspace_attempted |= names
+            self.run_worker(self._resolve_kspace(), exclusive=True, group="kspace")
+            return True
+        # Still in flight counts as pending; finished-and-unresolved does not.
+        return any(
+            w.group == "kspace" and not w.is_finished for w in self.workers
+        )
+
     async def _resolve_kspace(self) -> None:
         from vagari.enrichers.kspace import resolve_systems
 
@@ -478,6 +497,8 @@ class MapperApp(App):
         if resolved:
             self.session.kspace.update(resolved)
             self.refresh_all()
+            # The id may complete a dossier already on display.
+            self.query_one(DetailPanel).reshow()
 
     def action_focus_command(self) -> None:
         self.query_one("#command-bar", Input).focus()

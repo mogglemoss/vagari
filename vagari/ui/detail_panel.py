@@ -124,6 +124,86 @@ class DetailPanel(VerticalScroll):
         else:
             self._show_sig(data[1], data[2])
 
+    def _killboard_lines(self, system: System) -> list[str]:
+        """The killboard verdict for a system — it always says something.
+        Shown on the system's own dossier AND on the wormhole leading to
+        it: intel belongs on this side of the hole, before the splash."""
+        from vagari.enrichers.zkill import human_isk
+
+        kinfo = self.session.kspace.get(system.name)
+        info = lookup_system(system.name)
+        system_id = kinfo.system_id if kinfo is not None else (
+            info.system_id if info is not None else None
+        )
+        if system_id is None:
+            if system.name and not system.name.startswith("?"):
+                hook = getattr(self.app, "maybe_resolve_kspace", None)
+                if hook is not None and hook():
+                    return [
+                        f"[{MUTED}]KILLBOARD: identifying "
+                        f"{system.name}…[/{MUTED}]"
+                    ]
+                return [
+                    f"[{MUTED}]KILLBOARD: {system.name} appears on no "
+                    f"chart — name the system and the Bureau will "
+                    f"inquire.[/{MUTED}]"
+                ]
+            return [
+                f"[{MUTED}]KILLBOARD: system unnamed — nothing to ask "
+                f"after.[/{MUTED}]"
+            ]
+        zstats = self.session.zkill_stats.get(system_id)
+        if zstats is None:
+            dispatched = False
+            hook = getattr(self.app, "maybe_fetch_intel", None)
+            if hook is not None:
+                dispatched = hook(system.name, system_id)
+            if dispatched:
+                return [
+                    f"[{MUTED}]KILLBOARD: inquiry dispatched — awaiting "
+                    f"the void's reply…[/{MUTED}]"
+                ]
+            return [
+                f"[{MUTED}]KILLBOARD: nothing on file · "
+                f"[@click=app.fetch_intel({system_id}, '{system.name}')]"
+                f"inquire[/][/{MUTED}]"
+            ]
+        lines: list[str] = []
+        if zstats.stats is not None:
+            s = zstats.stats
+            lines.append(
+                f"[{MUTED}]ZKILL: {s.ships_destroyed:,} ships · "
+                f"{human_isk(s.isk_destroyed)} ISK destroyed all-time[/{MUTED}]"
+            )
+            lines.append(
+                f"[{MUTED}]ACTIVE: {s.active_characters} hunters · "
+                f"{s.active_ships} hull types recently[/{MUTED}]"
+            )
+        lk = zstats.last_kill
+        if lk is not None:
+            when = f"{age_text(lk.time)} ago" if lk.time else "recently"
+            color = WARN if lk.time and (
+                (utcnow() - lk.time).total_seconds() < 3600
+            ) else MUTED
+            lines.append(
+                f"[{color}]LAST KILL: {when} — {lk.ship_name}, "
+                f"{lk.attackers} attacker{'s' if lk.attackers != 1 else ''}"
+                f" · {human_isk(lk.isk)} ISK[/{color}]"
+            )
+        else:
+            lines.append(
+                f"[{MUTED}]LAST KILL: none on record — ever.[/{MUTED}]"
+            )
+        day_old = lk is not None and lk.time is not None and (
+            (utcnow() - lk.time).total_seconds() < 86400
+        )
+        if not day_old:
+            lines.append(
+                f"[{DIM}]QUIET — nothing destroyed here in the last "
+                f"day. The Bureau declines to be reassured.[/{DIM}]"
+            )
+        return lines
+
     def _show_system(self, system: System, path: list | None = None) -> None:
         lines = [f"[bold {RUST}]{system.name}[/bold {RUST}]"]
         is_root = path is not None and len(path) == 1
@@ -157,65 +237,7 @@ class DetailPanel(VerticalScroll):
                 f"[{MUTED}]· region {kinfo.region}[/{MUTED}]"
             )
         info = lookup_system(system.name)
-        system_id = kinfo.system_id if kinfo is not None else (
-            info.system_id if info is not None else None
-        )
-        zstats = (
-            self.session.zkill_stats.get(system_id)
-            if system_id is not None else None
-        )
-        if zstats is not None:
-            from vagari.enrichers.zkill import human_isk
-
-            if zstats.stats is not None:
-                s = zstats.stats
-                lines.append(
-                    f"[{MUTED}]ZKILL: {s.ships_destroyed:,} ships · "
-                    f"{human_isk(s.isk_destroyed)} ISK destroyed all-time[/{MUTED}]"
-                )
-                lines.append(
-                    f"[{MUTED}]ACTIVE: {s.active_characters} hunters · "
-                    f"{s.active_ships} hull types recently[/{MUTED}]"
-                )
-            lk = zstats.last_kill
-            if lk is not None:
-                when = f"{age_text(lk.time)} ago" if lk.time else "recently"
-                color = WARN if lk.time and (
-                    (utcnow() - lk.time).total_seconds() < 3600
-                ) else MUTED
-                lines.append(
-                    f"[{color}]LAST KILL: {when} — {lk.ship_name}, "
-                    f"{lk.attackers} attacker{'s' if lk.attackers != 1 else ''}"
-                    f" · {human_isk(lk.isk)} ISK[/{color}]"
-                )
-            else:
-                lines.append(
-                    f"[{MUTED}]LAST KILL: none on record — ever.[/{MUTED}]"
-                )
-            day_old = lk is not None and lk.time is not None and (
-                (utcnow() - lk.time).total_seconds() < 86400
-            )
-            if not day_old:
-                lines.append(
-                    f"[{DIM}]QUIET — nothing destroyed here in the last "
-                    f"day. The Bureau declines to be reassured.[/{DIM}]"
-                )
-        elif system_id is not None:
-            dispatched = False
-            hook = getattr(self.app, "maybe_fetch_intel", None)
-            if hook is not None:
-                dispatched = hook(system.name, system_id)
-            if dispatched:
-                lines.append(
-                    f"[{MUTED}]KILLBOARD: inquiry dispatched — awaiting "
-                    f"the void's reply…[/{MUTED}]"
-                )
-            else:
-                lines.append(
-                    f"[{MUTED}]KILLBOARD: nothing on file · "
-                    f"[@click=app.fetch_intel({system_id}, '{system.name}')]"
-                    f"inquire[/][/{MUTED}]"
-                )
+        lines += self._killboard_lines(system)
         if system.effect and info is not None:
             from vagari.parsers.catalog import effect_details
 
@@ -399,6 +421,9 @@ class DetailPanel(VerticalScroll):
             lines.append("")
             lines.append(f"[{MUTED}]WORMHOLE — leads to[/{MUTED}] "
                          f"[{TEXT}]{conn.child.name}[/{TEXT}]")
+            # Far-side intel, on this side of the hole — the whole point is
+            # knowing what waits before splashing it.
+            lines += self._killboard_lines(conn.child)
             wh_type = lookup_wh_type(conn.wh_type) if conn.wh_type else None
             if wh_type is not None:
                 # K162s carry no book data — target, mass, and lifetime are

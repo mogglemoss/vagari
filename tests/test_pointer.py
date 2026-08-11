@@ -375,3 +375,25 @@ async def test_dossier_opens_on_you(tmp_path):
         panel = app.query_one(DetailPanel)
         assert panel._showing == ("system", [0])
         assert "J105443" in str(panel.content)
+
+
+@pytest.mark.asyncio
+async def test_wormhole_sig_shows_far_side_killboard(tmp_path):
+    """Intel belongs on this side of the hole: the sig dossier carries the
+    destination's killboard section, before anyone splashes anything."""
+    app = make_app(tmp_path)  # recon off: states render, no network
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.session.execute("qlm J154535")
+        app.refresh_all()
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("sig", [0], "QLM"))
+        await pilot.pause()
+        text = str(panel.content)
+        assert "leads to" in text and "J154535" in text
+        assert "KILLBOARD" in text  # far-side section present
+        # Far side unnamed → still says something, asks nothing.
+        app.session.file_k162()
+        app.session.follow("?")
+        panel.show_node(("sig", [0], "QLM"))
+        assert "KILLBOARD" in str(panel.content)
