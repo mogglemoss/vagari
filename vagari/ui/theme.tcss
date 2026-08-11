@@ -119,12 +119,27 @@ CommandPalette OptionList {
     background: $warm-surface;
     border: none;
 }
-CommandPalette OptionList > .option-list--option-highlighted {
+/* CommandList's own defaults and OptionList:focus outrank plain
+   type selectors — match every state explicitly or the factory blue
+   leaks back in on hover and focused-highlight. */
+CommandPalette OptionList > .option-list--option-highlighted,
+CommandPalette OptionList:focus > .option-list--option-highlighted,
+CommandPalette CommandList > .option-list--option-highlighted,
+CommandPalette CommandList:focus > .option-list--option-highlighted {
     background: $rust 20%;
     color: $warm-text;
+    text-style: none;
 }
-CommandPalette OptionList > .option-list--option-hover {
-    background: $warm-panel;
+CommandPalette OptionList > .option-list--option-hover,
+CommandPalette CommandList > .option-list--option-hover {
+    background: $rust 12%;
+}
+OptionList > .option-list--option-hover {
+    background: $rust 12%;
+}
+OptionList:focus > .option-list--option-highlighted {
+    background: $rust 20%;
+    color: $warm-text;
 }
 
 /* Action links (dossier verbs, candidate types, header badges):

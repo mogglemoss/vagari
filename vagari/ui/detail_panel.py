@@ -27,6 +27,15 @@ def _link(label: str, action: str, color: str = MUTED) -> str:
     return f"[{color}][@click=app.{action}]{label}[/][/{color}]"
 
 
+def _rule(title: str) -> str:
+    """A section rule: ── TITLE ─────────"""
+    bar = "─" * max(3, 26 - len(title))
+    return (
+        f"[{DIM}]──[/{DIM}] [bold {MUTED}]{title}[/bold {MUTED}] "
+        f"[{DIM}]{bar}[/{DIM}]"
+    )
+
+
 EMPTY_STATE = f"""\
 [{MUTED}]FORM ACB-01 (CHAIN CUSTODY)[/{MUTED}]
 
@@ -140,17 +149,14 @@ class DetailPanel(VerticalScroll):
                 hook = getattr(self.app, "maybe_resolve_kspace", None)
                 if hook is not None and hook():
                     return [
-                        f"[{MUTED}]KILLBOARD: identifying "
-                        f"{system.name}…[/{MUTED}]"
+                        f"  [{MUTED}]identifying {system.name}…[/{MUTED}]"
                     ]
                 return [
-                    f"[{MUTED}]KILLBOARD: {system.name} appears on no "
-                    f"chart — name the system and the Bureau will "
-                    f"inquire.[/{MUTED}]"
+                    f"  [{MUTED}]{system.name} appears on no chart — name "
+                    f"the system and the Bureau will inquire.[/{MUTED}]"
                 ]
             return [
-                f"[{MUTED}]KILLBOARD: system unnamed — nothing to ask "
-                f"after.[/{MUTED}]"
+                f"  [{MUTED}]system unnamed — nothing to ask after.[/{MUTED}]"
             ]
         zstats = self.session.zkill_stats.get(system_id)
         if zstats is None:
@@ -160,11 +166,11 @@ class DetailPanel(VerticalScroll):
                 dispatched = hook(system.name, system_id)
             if dispatched:
                 return [
-                    f"[{MUTED}]KILLBOARD: inquiry dispatched — awaiting "
-                    f"the void's reply…[/{MUTED}]"
+                    f"  [{MUTED}]inquiry dispatched — awaiting the void's "
+                    f"reply…[/{MUTED}]"
                 ]
             return [
-                f"[{MUTED}]KILLBOARD: nothing on file · "
+                f"  [{MUTED}]nothing on file · "
                 f"[@click=app.fetch_intel({system_id}, '{system.name}')]"
                 f"inquire[/][/{MUTED}]"
             ]
@@ -172,12 +178,14 @@ class DetailPanel(VerticalScroll):
         if zstats.stats is not None:
             s = zstats.stats
             lines.append(
-                f"[{MUTED}]ZKILL: {s.ships_destroyed:,} ships · "
-                f"{human_isk(s.isk_destroyed)} ISK destroyed all-time[/{MUTED}]"
+                f"  [{TEXT}]{s.ships_destroyed:,}[/{TEXT}] [{MUTED}]ships · "
+                f"[/{MUTED}][{TEXT}]{human_isk(s.isk_destroyed)}[/{TEXT}] "
+                f"[{MUTED}]ISK destroyed all-time[/{MUTED}]"
             )
             lines.append(
-                f"[{MUTED}]ACTIVE: {s.active_characters} hunters · "
-                f"{s.active_ships} hull types recently[/{MUTED}]"
+                f"  [{TEXT}]{s.active_characters}[/{TEXT}] [{MUTED}]hunters "
+                f"active · [/{MUTED}][{TEXT}]{s.active_ships}[/{TEXT}] "
+                f"[{MUTED}]hulls seen recently[/{MUTED}]"
             )
         lk = zstats.last_kill
         if lk is not None:
@@ -186,26 +194,48 @@ class DetailPanel(VerticalScroll):
                 (utcnow() - lk.time).total_seconds() < 3600
             ) else MUTED
             lines.append(
-                f"[{color}]LAST KILL: {when} — {lk.ship_name}, "
+                f"  [{color}]LAST KILL: {when} — {lk.ship_name} down, "
                 f"{lk.attackers} attacker{'s' if lk.attackers != 1 else ''}"
                 f" · {human_isk(lk.isk)} ISK[/{color}]"
             )
+            # Structure and NPC kills carry no pilot: lead with whatever
+            # identity the killmail does hold.
+            by = lk.killer or lk.killer_corp
+            org = " · ".join(
+                b for b in (lk.killer_corp, lk.killer_alliance)
+                if b and b != by
+            )
+            if by and org:
+                by += f" ({org})"
+            if by and lk.killer_ship:
+                by += f" · {lk.killer_ship}"
+            elif not by and lk.killer_ship:
+                by = lk.killer_ship
+            if by:
+                lines.append(
+                    f"    [{color}]└ {by.replace('[', chr(92) + '[')}"
+                    f"[/{color}]"
+                )
         else:
             lines.append(
-                f"[{MUTED}]LAST KILL: none on record — ever.[/{MUTED}]"
+                f"  [{MUTED}]LAST KILL: none on record — ever.[/{MUTED}]"
             )
         day_old = lk is not None and lk.time is not None and (
             (utcnow() - lk.time).total_seconds() < 86400
         )
         if not day_old:
             lines.append(
-                f"[{DIM}]QUIET — nothing destroyed here in the last "
+                f"  [{DIM}]QUIET — nothing destroyed here in the last "
                 f"day. The Bureau declines to be reassured.[/{DIM}]"
             )
         return lines
 
     def _show_system(self, system: System, path: list | None = None) -> None:
-        lines = [f"[bold {RUST}]{system.name}[/bold {RUST}]"]
+        current = path is not None and list(path) == list(self.session.chain.location)
+        title = f"[bold {RUST}]{system.name}[/bold {RUST}]"
+        if current:
+            title += f"  [{RUST}]◉ YOU ARE HERE[/{RUST}]"
+        lines = [title]
         is_root = path is not None and len(path) == 1
         if is_root and len(self.session.chain.roots) > 1:
             n = path[0] + 1
@@ -213,7 +243,6 @@ class DetailPanel(VerticalScroll):
                 f"[{MUTED}]fragment #{n} · "
                 f"[@click=app.sig_cmd('del')]discard[/][/{MUTED}]"
             )
-        current = path is not None and list(path) == list(self.session.chain.location)
         actions = []
         if not current:
             actions.append(_link("nav", "nav_selected", RUST))
@@ -224,25 +253,15 @@ class DetailPanel(VerticalScroll):
             actions.append(_link("strike", f"run_cmd('strike {system.name}')"))
         if actions:
             lines.append(f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions))
-        if system.jclass:
-            statics = f" · statics {system.statics}" if system.statics else ""
-            lines.append(f"[{TEXT}]{system.jclass}{statics}[/{TEXT}]")
-        if system.effect:
-            lines.append(f"[{WARN}]{system.effect}[/{WARN}]")
-        kinfo = self.session.kspace.get(system.name)
-        if kinfo is not None:
-            sec_color = {"H": TEXT, "L": WARN, "N": DIM}[kinfo.band]
-            lines.append(
-                f"[{sec_color}]security {kinfo.sec_display}[/{sec_color}] "
-                f"[{MUTED}]· region {kinfo.region}[/{MUTED}]"
-            )
+        lines.append("")
+        # Identity: class, statics, region — one tidy block.
         info = lookup_system(system.name)
-        lines += self._killboard_lines(system)
-        if system.effect and info is not None:
-            from vagari.parsers.catalog import effect_details
-
-            for attr, value in effect_details(system.effect, info.class_key) or []:
-                lines.append(f"  [{MUTED}]{attr}[/{MUTED}] [{TEXT}]{value}[/{TEXT}]")
+        if system.jclass:
+            statics = system.statics
+            if isinstance(statics, (list, tuple)):
+                statics = " · ".join(statics)
+            statics = f" [{MUTED}]· statics[/{MUTED}] {statics}" if statics else ""
+            lines.append(f"[{TEXT}]{system.jclass}{statics}[/{TEXT}]")
         if info is not None:
             extras = []
             if info.region:
@@ -251,28 +270,51 @@ class DetailPanel(VerticalScroll):
                 extras.append("SHATTERED")
             if extras:
                 lines.append(f"[{MUTED}]{' · '.join(extras)}[/{MUTED}]")
+        kinfo = self.session.kspace.get(system.name)
+        if kinfo is not None:
+            sec_color = {"H": TEXT, "L": WARN, "N": DIM}[kinfo.band]
+            lines.append(
+                f"[{sec_color}]security {kinfo.sec_display}[/{sec_color}] "
+                f"[{MUTED}]· region {kinfo.region}[/{MUTED}]"
+            )
+        if system.effect:
+            lines.append(f"[{WARN}]{system.effect}[/{WARN}]")
+            if info is not None:
+                from vagari.parsers.catalog import effect_details
+
+                for attr, value in effect_details(
+                    system.effect, info.class_key
+                ) or []:
+                    lines.append(
+                        f"  [{MUTED}]{attr}[/{MUTED}] [{TEXT}]{value}[/{TEXT}]"
+                    )
+        lines += ["", _rule("KILLBOARD")]
+        lines += self._killboard_lines(system)
+        act = []
+        history = []
+        if info is not None:
             activity = self.session.activity.get(info.system_id)
             if activity is not None:
                 color = WARN if activity.hostile else MUTED
-                lines.append(
-                    f"[{color}]ACTIVITY (last hour): {activity.ship_kills} ship · "
-                    f"{activity.pod_kills} pod · {activity.npc_kills} NPC[/{color}]"
+                act.append(
+                    f"  [{color}]last hour: {activity.ship_kills} ship · "
+                    f"{activity.pod_kills} pod · {activity.npc_kills} "
+                    f"NPC[/{color}]"
                 )
             elif self.session.activity_fetched:
-                lines.append(f"[{MUTED}]ACTIVITY (last hour): none observed[/{MUTED}]")
-        history = []
-        if info is not None:
+                act.append(f"  [{MUTED}]last hour: none observed[/{MUTED}]")
             history = self.session.activity_history.get(info.system_id, [])
             if len(history) >= 2:
-                lines.append(f"[{MUTED}]TREND (PvP, per recon sweep):[/{MUTED}]")
+                act.append(f"  [{MUTED}]PvP trend, per recon sweep:[/{MUTED}]")
+        if act:
+            lines += ["", _rule("ACTIVITY")] + act
         lines.append("")
         if system.sigs:
-            lines.append(
-                f"[{MUTED}]SIGNATURES ({len(system.sigs)}) — click a row "
-                f"to select[/{MUTED}]"
-            )
+            lines.append(_rule(f"SIGNATURES · {len(system.sigs)}"))
+            lines.append(f"  [{DIM}]click a row to select[/{DIM}]")
         else:
-            lines.append(f"[{MUTED}]NO SIGNATURES ON RECORD.[/{MUTED}]")
+            lines.append(_rule("SIGNATURES"))
+            lines.append(f"  [{MUTED}]none on record.[/{MUTED}]")
         self.update("\n".join(lines))
 
         from vagari.glyphs import kind_word
@@ -391,11 +433,7 @@ class DetailPanel(VerticalScroll):
             if candidates:
                 info = lookup_system(system.name)
                 static_codes = set(info.statics) if info else set()
-                lines.append("")
-                lines.append(
-                    f"[{MUTED}]CANDIDATE TYPES for a hole in "
-                    f"{system.name}:[/{MUTED}]"
-                )
+                lines += ["", _rule("CANDIDATE TYPES")]
                 for t in candidates[:10]:
                     if t.code == "K162":
                         lines.append(
@@ -412,18 +450,13 @@ class DetailPanel(VerticalScroll):
                         f"{t.code} → {t.target_display}{life}{marker}[/][/{color}]"
                     )
                 lines.append(
-                    f"  [{DIM}](click a candidate — or type any code, even a "
-                    f"rare one, in the field below)[/{DIM}]"
+                    f"  [{DIM}]click a candidate — or type any code, even a "
+                    f"rare one, in the field below[/{DIM}]"
                 )
-                if len(candidates) > 9:
-                    lines.append(f"  [{MUTED}]… and {len(candidates) - 9} more[/{MUTED}]")
         if conn is not None:
-            lines.append("")
-            lines.append(f"[{MUTED}]WORMHOLE — leads to[/{MUTED}] "
+            lines += ["", _rule("WORMHOLE")]
+            lines.append(f"  [{MUTED}]leads to[/{MUTED}] "
                          f"[{TEXT}]{conn.child.name}[/{TEXT}]")
-            # Far-side intel, on this side of the hole — the whole point is
-            # knowing what waits before splashing it.
-            lines += self._killboard_lines(conn.child)
             wh_type = lookup_wh_type(conn.wh_type) if conn.wh_type else None
             if wh_type is not None:
                 # K162s carry no book data — target, mass, and lifetime are
@@ -434,7 +467,7 @@ class DetailPanel(VerticalScroll):
                 if wh_type.lifetime_hours:
                     bits.append(f"lifetime {wh_type.lifetime_hours:g}h")
                 bits.append(f"open {age_text(conn.opened_at)}")
-                lines.append(f"[{MUTED}]{' · '.join(bits)}[/{MUTED}]")
+                lines.append(f"  [{MUTED}]{' · '.join(bits)}[/{MUTED}]")
                 mass_bits = []
                 if wh_type.total_mass:
                     mass_bits.append(f"total {human_mass(wh_type.total_mass)}")
@@ -443,12 +476,13 @@ class DetailPanel(VerticalScroll):
                 if wh_type.mass_regen:
                     mass_bits.append(f"regen {human_mass(wh_type.mass_regen)}/day")
                 if mass_bits:
-                    lines.append(f"[{MUTED}]{' · '.join(mass_bits)}[/{MUTED}]")
+                    lines.append(f"  [{MUTED}]{' · '.join(mass_bits)}[/{MUTED}]")
                 life = assess(conn)
                 if life.remaining_hours is not None:
                     if life.status is LifeStatus.EXPIRED:
                         lines.append(
-                            f"[bold {DIM}]PAST BOOK LIFETIME — verify and cull[/bold {DIM}]"
+                            f"  [bold {DIM}]PAST BOOK LIFETIME — verify and "
+                            f"cull[/bold {DIM}]"
                         )
                     else:
                         color = WARN if life.status in (
@@ -459,18 +493,25 @@ class DetailPanel(VerticalScroll):
                             if life.total_hours else 0
                         )
                         lines.append(
-                            f"[{color}]LIFE {gauge(fraction)} "
+                            f"  [{color}]LIFE {gauge(fraction)} "
                             f"≤{hours_text(life.remaining_hours)} remaining "
                             f"(upper bound)[/{color}]"
                         )
             else:
-                lines.append(f"[{MUTED}]open {age_text(conn.opened_at)}[/{MUTED}]")
+                lines.append(
+                    f"  [{MUTED}]open {age_text(conn.opened_at)}[/{MUTED}]"
+                )
             mass_fraction = {"fresh": 1.0, "reduced": 0.5, "critical": 0.1}[conn.mass.value]
             mass_color = MUTED if conn.mass.value == "fresh" else WARN
             lines.append(
-                f"[{mass_color}]MASS {gauge(mass_fraction, cells=3)} "
+                f"  [{mass_color}]MASS {gauge(mass_fraction, cells=3)} "
                 f"{conn.mass.value.upper()}[/{mass_color}]"
             )
             if conn.eol:
-                lines.append(f"[bold {DIM}]END OF LIFE[/bold {DIM}]")
+                lines.append(f"  [bold {DIM}]END OF LIFE[/bold {DIM}]")
+            # Far-side intel, on this side of the hole — the whole point is
+            # knowing what waits before splashing it.
+            far = conn.child.name if conn.child.name else "?"
+            lines += ["", _rule(f"FAR SIDE · {far}")]
+            lines += self._killboard_lines(conn.child)
         self.update("\n".join(lines))

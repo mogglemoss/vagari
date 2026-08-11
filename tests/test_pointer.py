@@ -310,7 +310,7 @@ async def test_killboard_section_always_present(tmp_path):
         panel.show_node(("system", [0]))
         await pilot.pause()
         text = str(panel.content)
-        assert "KILLBOARD: nothing on file" in text
+        assert "nothing on file" in text
         assert "@click=app.fetch_intel(" in text
 
         sid = lookup_system("J105443").system_id
@@ -359,7 +359,7 @@ async def test_dossier_auto_intel(tmp_path, monkeypatch):
         await app.workers.wait_for_complete()
         await pilot.pause()
         text = str(panel.content)
-        assert "42 ships" in text and "9.0B" in text
+        assert "42" in text and "9.0B" in text and "ships" in text
         panel.show_node(("system", [0]))
         await pilot.pause()
         assert len(calls) == 1  # answered: no second inquiry
@@ -391,9 +391,9 @@ async def test_wormhole_sig_shows_far_side_killboard(tmp_path):
         await pilot.pause()
         text = str(panel.content)
         assert "leads to" in text and "J154535" in text
-        assert "KILLBOARD" in text  # far-side section present
+        assert "FAR SIDE" in text  # far-side intel section present
         # Far side unnamed → still says something, asks nothing.
         app.session.file_k162()
         app.session.follow("?")
         panel.show_node(("sig", [0], "QLM"))
-        assert "KILLBOARD" in str(panel.content)
+        assert "FAR SIDE" in str(panel.content)

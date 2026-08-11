@@ -94,23 +94,60 @@ def test_parse_system_stats():
 
 
 def test_parse_last_kill():
-    from vagari.enrichers.zkill import LastKill, parse_last_kill
+    from vagari.enrichers.zkill import kill_ids, parse_last_kill
 
     kills = [
         {
             "killmail_time": "2026-08-11T14:03:00Z",
-            "attackers": [{}, {}, {}],
+            "attackers": [
+                {"character_id": 11, "ship_type_id": 22},
+                {
+                    "character_id": 12,
+                    "corporation_id": 33,
+                    "alliance_id": 44,
+                    "ship_type_id": 55,
+                    "final_blow": True,
+                },
+            ],
             "victim": {"ship_type_id": 670},
             "zkb": {"totalValue": 12_400_000.0},
         }
     ]
-    lk = parse_last_kill(kills, ship_name="Capsule")
+    assert set(kill_ids(kills[0])) == {670, 12, 33, 44, 55}
+    names = {670: "Capsule", 12: "Vile Rat", 33: "GoonWaffe",
+             44: "Goonswarm Federation", 55: "Loki"}
+    lk = parse_last_kill(kills, names)
     assert lk is not None
     assert lk.ship_name == "Capsule"
-    assert lk.attackers == 3
+    assert lk.attackers == 2
     assert lk.isk == 12_400_000.0
     assert lk.time is not None and lk.time.hour == 14
+    assert lk.killer == "Vile Rat"
+    assert lk.killer_corp == "GoonWaffe"
+    assert lk.killer_alliance == "Goonswarm Federation"
+    assert lk.killer_ship == "Loki"
     assert parse_last_kill([]) is None
+
+
+def test_parse_last_kill_npc_final_blow():
+    from vagari.enrichers.zkill import parse_last_kill
+
+    kills = [
+        {
+            "killmail_time": "2026-08-03T20:17:19Z",
+            "attackers": [
+                {"faction_id": 500021, "ship_type_id": 30205,
+                 "final_blow": True}
+            ],
+            "victim": {"ship_type_id": 605},
+            "zkb": {"totalValue": 1_305_129.66},
+        }
+    ]
+    names = {605: "Heron", 500021: "Unknown", 30205: "Sleepless Patroller"}
+    lk = parse_last_kill(kills, names)
+    assert lk.killer == "Unknown"        # NPC faction stands in as killer
+    assert lk.killer_ship == "Sleepless Patroller"
+    assert lk.killer_corp == ""
 
 
 def test_human_isk():

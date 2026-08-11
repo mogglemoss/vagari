@@ -16,13 +16,13 @@ from vagari.enrichers.activity import USER_AGENT
 
 ZKILL_STATS = "https://zkillboard.com/api/stats/solarSystemID/{system_id}/"
 ZKILL_KILLS = "https://zkillboard.com/api/kills/solarSystemID/{system_id}/"
-ESI_TYPE = "https://esi.evetech.net/latest/universe/types/{type_id}/"
+ESI_NAMES = "https://esi.evetech.net/latest/universe/names/"
 
 _CLIENT_KW = dict(
     timeout=10.0, headers={"User-Agent": USER_AGENT}, follow_redirects=True
 )
 
-_type_names: dict[int, str] = {}  # ship type id → name, session cache
+_names: dict[int, str] = {}  # any ESI id → name, session cache
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,10 @@ class LastKill:
     ship_name: str               # victim hull
     attackers: int
     isk: float                   # zkb totalValue
+    killer: str = ""             # final blow: character or NPC faction
+    killer_corp: str = ""
+    killer_alliance: str = ""
+    killer_ship: str = ""        # what the killer was flying
 
 
 @dataclass(frozen=True)
@@ -61,10 +65,35 @@ def parse_system_stats(payload: dict) -> SystemKillStats:
     )
 
 
-def parse_last_kill(kills: list, ship_name: str = "?") -> LastKill | None:
-    """The kills feed carries full killmails inline these days."""
+def _final_blow(km: dict) -> dict:
+    attackers = km.get("attackers") or []
+    for a in attackers:
+        if a.get("final_blow"):
+            return a
+    return attackers[0] if attackers else {}
+
+
+def kill_ids(km: dict) -> list[int]:
+    """Every id on the killmail worth a name: victim hull, and the final
+    blow's character (or NPC faction), corp, alliance, and hull."""
+    fb = _final_blow(km)
+    ids = [
+        (km.get("victim") or {}).get("ship_type_id"),
+        fb.get("character_id"),
+        fb.get("faction_id"),
+        fb.get("corporation_id"),
+        fb.get("alliance_id"),
+        fb.get("ship_type_id"),
+    ]
+    return [i for i in ids if i]
+
+
+def parse_last_kill(kills: list, names: dict[int, str] | None = None) -> LastKill | None:
+    """The kills feed carries full killmails inline these days; `names`
+    maps the killmail's ids to display names (see kill_ids)."""
     if not kills:
         return None
+    names = names or {}
     km = kills[0]
     time = None
     raw = km.get("killmail_time")
@@ -73,25 +102,40 @@ def parse_last_kill(kills: list, ship_name: str = "?") -> LastKill | None:
             time = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         except ValueError:
             pass
+    fb = _final_blow(km)
+
+    def name(key: str) -> str:
+        return names.get(fb.get(key), "") if fb.get(key) else ""
+
     return LastKill(
         time=time,
-        ship_name=ship_name,
+        ship_name=names.get(
+            (km.get("victim") or {}).get("ship_type_id"), "?"
+        ),
         attackers=len(km.get("attackers") or []),
         isk=float((km.get("zkb") or {}).get("totalValue") or 0),
+        killer=name("character_id") or name("faction_id"),
+        killer_corp=name("corporation_id"),
+        killer_alliance=name("alliance_id"),
+        killer_ship=name("ship_type_id"),
     )
 
 
-async def _ship_name(client: httpx.AsyncClient, type_id: int | None) -> str:
-    if not type_id:
-        return "?"
-    if type_id not in _type_names:
+async def _resolve_names(
+    client: httpx.AsyncClient, ids: list[int]
+) -> dict[int, str]:
+    """ESI /universe/names/: one POST covers characters, corps, alliances,
+    factions, and hulls alike. Session-cached; fail-silent."""
+    missing = [i for i in set(ids) if i not in _names]
+    if missing:
         try:
-            r = await client.get(ESI_TYPE.format(type_id=type_id))
+            r = await client.post(ESI_NAMES, json=missing)
             r.raise_for_status()
-            _type_names[type_id] = r.json().get("name", "?")
+            for row in r.json():
+                _names[row["id"]] = row["name"]
         except Exception:
-            return "?"
-    return _type_names[type_id]
+            pass
+    return _names
 
 
 async def fetch_system_intel(system_id: int) -> SystemIntel | None:
@@ -109,13 +153,10 @@ async def fetch_system_intel(system_id: int) -> SystemIntel | None:
                 r = await client.get(ZKILL_KILLS.format(system_id=system_id))
                 r.raise_for_status()
                 kills = r.json()
-                ship = "?"
+                names = {}
                 if kills:
-                    ship = await _ship_name(
-                        client,
-                        (kills[0].get("victim") or {}).get("ship_type_id"),
-                    )
-                last = parse_last_kill(kills, ship)
+                    names = await _resolve_names(client, kill_ids(kills[0]))
+                last = parse_last_kill(kills, names)
             except Exception:
                 pass
     except Exception:

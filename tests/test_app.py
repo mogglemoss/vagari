@@ -347,14 +347,19 @@ async def test_kspace_rendering(tmp_path):
                 ship_name="Capsule",
                 attackers=3,
                 isk=12_400_000.0,
+                killer="Vile Rat",
+                killer_corp="GoonWaffe",
+                killer_alliance="Goonswarm Federation",
+                killer_ship="Loki",
             ),
         )
         panel = app.query_one(DetailPanel)
         panel.show_node(("system", [0, "ZAA"]))
         text = str(panel.content)
         assert "security 0.9" in text and "The Forge" in text
-        assert "1,538,343 ships" in text and "177.4T" in text
+        assert "1,538,343" in text and "177.4T" in text
         assert "LAST KILL" in text and "Capsule" in text and "12.4M" in text
+        assert "Vile Rat (GoonWaffe · Goonswarm Federation) · Loki" in text
 
 
 @pytest.mark.asyncio
