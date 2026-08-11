@@ -224,8 +224,16 @@ Toast .toast--title {
 }
 
 /* Dossier widgets */
+#dossier-head {
+    height: auto;
+}
 #dossier-body {
     height: auto;
+    margin: 1 0 0 0;
+}
+#dossier-sigs-header {
+    height: auto;
+    margin: 1 0 0 0;
 }
 #dossier-eol {
     height: 3;
@@ -296,6 +304,5 @@ DataTable > .datatable--odd-row {
 #dossier-sigs {
     height: auto;
     max-height: 14;
-    margin: 1 0 0 0;
     scrollbar-size-horizontal: 0;  /* names are truncated; no bar needed */
 }

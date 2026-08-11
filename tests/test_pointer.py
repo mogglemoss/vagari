@@ -92,7 +92,7 @@ async def test_candidate_types_for_untyped_hole(tmp_path):
         panel = app.query_one(DetailPanel)
         panel.show_node(("sig", [0], "QLM"))  # wormhole, never typed
         text = str(panel.content)
-        assert "CANDIDATE TYPES" in text
+        assert "PLAUSIBLE DESIGNATIONS" in text
         assert "static" in text  # the system's static is marked
         assert "K162" in text and "inbound" in text  # the eternal candidate
 
@@ -181,10 +181,14 @@ async def test_dossier_sig_table_selects(tmp_path):
         table = panel.query_one("#dossier-sigs", DataTable)
         assert table.display and table.row_count == 4
 
+        cursor_before = app.query_one(ChainTree).cursor_node
         table.move_cursor(row=2)  # FIY
         table.action_select_cursor()
         await pilot.pause()
-        assert app.query_one(ChainTree).cursor_node.data == ("sig", [0], "FIY")
+        # Drills the DOSSIER into the row; the map cursor stays put.
+        assert panel._showing == ("sig", [0], "FIY")
+        assert "FIY" in str(panel.content)
+        assert app.query_one(ChainTree).cursor_node is cursor_before
 
 
 @pytest.mark.asyncio
@@ -288,6 +292,7 @@ async def test_sig_cmd_qualifies_remote_selection(tmp_path):
         await pilot.pause()
         tree = app.query_one(ChainTree)
         assert tree.move_to_data(("sig", [0], "FIY"))  # back in the root
+        await pilot.pause()  # highlight lands in the dossier
         app.action_sig_cmd("flag")
         await pilot.pause()
         assert app.session.chain.root.find_sig("FIY").flagged
@@ -391,12 +396,12 @@ async def test_wormhole_sig_shows_far_side_killboard(tmp_path):
         await pilot.pause()
         text = str(panel.content)
         assert "leads to" in text and "J154535" in text
-        assert "FAR SIDE" in text  # far-side intel section present
+        assert "WHAT AWAITS" in text  # far-side intel section present
         # Far side unnamed → still says something, asks nothing.
         app.session.file_k162()
         app.session.follow("?")
         panel.show_node(("sig", [0], "QLM"))
-        assert "FAR SIDE" in str(panel.content)
+        assert "WHAT AWAITS" in str(panel.content)
 
 
 @pytest.mark.asyncio

@@ -241,6 +241,9 @@ class MapperApp(App):
     def _refresh_all(self) -> None:
         tree = self.query_one(ChainTree)
         tree.rebuild()
+        # The dossier re-renders its own subject with the fresh record —
+        # it does not reset to wherever the cursor happens to sit.
+        self.query_one(DetailPanel).reshow()
         view = self.session.view
         tree.border_title = (
             "THE CHAIN" if view == "full" else f"THE CHAIN · {view.upper()} VIEW"
@@ -338,23 +341,33 @@ class MapperApp(App):
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
         panels = self.query(DetailPanel)
-        if panels:  # guard: highlight events can fire during teardown
-            panels.first().show_node(event.node.data)
+        if not panels:  # guard: highlight events can fire during teardown
+            return
+        tree = self.query_one(ChainTree)
+        # Rebuilds restore the cursor to where it already was; that echo
+        # must not clobber a dossier the user drilled into. Only a cursor
+        # that actually MOVED drives the dossier.
+        if event.node.data == getattr(tree, "last_cursor_data", None):
+            return
+        tree.last_cursor_data = event.node.data
+        panels.first().show_node(event.node.data)
 
     def on_data_table_row_selected(self, event) -> None:
-        """Dossier signature table: clicking a row selects it on the map."""
+        """Dossier signature table: a row click drills into that sig's
+        dossier. The map cursor stays where the user put it."""
         panel = self.query_one(DetailPanel)
         prefix = event.row_key.value if event.row_key else None
         if prefix:
-            self.query_one(ChainTree).move_to_data(
-                ("sig", list(panel.table_path), prefix)
-            )
+            panel.show_node(("sig", list(panel.table_path), prefix))
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         tree = self.query_one(ChainTree)
         if tree.suppress_click_nav:
             tree.suppress_click_nav = False
-            return  # single click inspects; double-click or Enter proceeds
+            # Single click inspects — always, even when the cursor was
+            # already on this node (the dossier may be drilled elsewhere).
+            self.query_one(DetailPanel).show_node(event.node.data)
+            return
         data = event.node.data
         if data is None:
             return
@@ -369,10 +382,16 @@ class MapperApp(App):
         self._after_engine(self.session.jump(path))
 
     def _selected_sig(self) -> tuple[list, str] | None:
-        node = self.query_one(ChainTree).cursor_node
-        if node is None or node.data is None or node.data[0] != "sig":
+        """The signature the dossier presently shows — action links and
+        keys affect what the user is looking at. Falls back to the map
+        cursor only when the dossier is empty."""
+        data = self.query_one(DetailPanel)._showing
+        if data is None:
+            node = self.query_one(ChainTree).cursor_node
+            data = node.data if node is not None else None
+        if data is None or data[0] != "sig":
             return None
-        return node.data[1], node.data[2]
+        return data[1], data[2]
 
     # -- actions -------------------------------------------------------------
 
@@ -574,11 +593,28 @@ class MapperApp(App):
             self.status(f"Cursor on ◉ YOU — {self.session.chain.current().name}.")
 
     def action_nav_selected(self) -> None:
-        """Detail-panel action link: proceed to the selection."""
-        node = self.query_one(ChainTree).cursor_node
-        if node is not None and node.data is not None:
-            self.query_one(ChainTree).suppress_click_nav = False
-            self.on_tree_node_selected(Tree.NodeSelected(node))
+        """Dossier action link: proceed to what the dossier shows."""
+        data = self.query_one(DetailPanel)._showing
+        if data is None:
+            return
+        if data[0] == "system":
+            path = list(data[1])
+        else:
+            _, path, prefix = data
+            system = self.session.chain.system_at(path)
+            if system.find_connection(prefix) is None:
+                return
+            path = list(path) + [prefix]
+        self._after_engine(self.session.jump(path))
+        self.query_one(ChainTree).move_to_data(
+            ("system", list(self.session.chain.location))
+        )
+
+    def action_open_system_dossier(self, spec: str) -> None:
+        """Dossier back-link: the sig's parent system, in the dossier."""
+        parts = str(spec).split("/")
+        path = [int(parts[0])] + parts[1:]
+        self.query_one(DetailPanel).show_node(("system", path))
 
     def action_return_selected(self) -> None:
         """Detail-panel action link: file selection as the return side."""
@@ -605,16 +641,15 @@ class MapperApp(App):
         self.refresh_all()  # show LAZY ARMED in header
 
     def action_sig_cmd(self, cmd: str) -> None:
-        # `d` on a fragment header discards the fragment itself.
+        # `d` with a fragment header on display discards the fragment.
         if cmd == "del":
-            node = self.query_one(ChainTree).cursor_node
+            shown = self.query_one(DetailPanel)._showing
             if (
-                node is not None
-                and node.data is not None
-                and node.data[0] == "system"
-                and len(node.data[1]) == 1
+                shown is not None
+                and shown[0] == "system"
+                and len(shown[1]) == 1
             ):
-                ri = node.data[1][0]
+                ri = shown[1][0]
                 self._after_engine(self.session.execute(f"discard {ri + 1}"))
                 return
         selected = self._selected_sig()

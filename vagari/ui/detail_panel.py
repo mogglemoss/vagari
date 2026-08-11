@@ -63,10 +63,15 @@ class DetailPanel(VerticalScroll):
         self._showing: tuple | None = None
 
     def compose(self) -> ComposeResult:
+        # The filing field sits between the head (identity, actions) and
+        # the body (sections): it belongs to the entity, not to whatever
+        # section happens to end the body.
+        yield Static("", id="dossier-head")
+        yield Input(id="dossier-form")
         yield Static(EMPTY_STATE, id="dossier-body")
         yield Digits("", id="dossier-eol")
         yield Sparkline([], id="dossier-trend")
-        yield Input(id="dossier-form")
+        yield Static("", id="dossier-sigs-header")
         yield DataTable(id="dossier-sigs")
 
     def on_mount(self) -> None:
@@ -77,19 +82,25 @@ class DetailPanel(VerticalScroll):
 
     @property
     def content(self):
-        """The markup body — kept for callers (and tests) that read text."""
-        return self.query_one("#dossier-body", Static).content
+        """Head + body markup — for callers (and tests) that read text."""
+        head = self.query_one("#dossier-head", Static).content
+        body = self.query_one("#dossier-body", Static).content
+        return f"{head}\n{body}" if head else str(body)
 
-    def update(self, markup: str) -> None:
+    def update(self, markup: str, head: str = "") -> None:
+        self.query_one("#dossier-head", Static).update(head)
+        self.query_one("#dossier-head", Static).display = bool(head)
         self.query_one("#dossier-body", Static).update(markup)
 
     def _extras(
-        self, eol: bool, trend: bool, table: bool, form: bool = False
+        self, eol: bool, trend: bool, table: bool,
+        form: bool = False, sigs_header: bool = False,
     ) -> None:
         self.query_one("#dossier-eol").display = eol
         self.query_one("#dossier-trend").display = trend
         self.query_one("#dossier-sigs").display = table
         self.query_one("#dossier-form").display = form
+        self.query_one("#dossier-sigs-header").display = sigs_header
         if not form:
             self._form_wrap = None
 
@@ -128,10 +139,23 @@ class DetailPanel(VerticalScroll):
             self.update(EMPTY_STATE)
             self._extras(False, False, False)
             return
-        if data[0] == "system":
-            self._show_system(self.session.chain.system_at(data[1]), data[1])
-        else:
-            self._show_sig(data[1], data[2])
+        try:
+            if data[0] == "system":
+                self._show_system(
+                    self.session.chain.system_at(data[1]), data[1]
+                )
+            else:
+                self._show_sig(data[1], data[2])
+        except Exception:
+            # The subject vanished from the record (fragment discarded,
+            # chain switched) — fall back to ◉ YOU rather than crash.
+            fallback = ("system", list(self.session.chain.location))
+            if data != fallback:
+                self.show_node(fallback)
+            else:
+                self._showing = None
+                self.update(EMPTY_STATE)
+                self._extras(False, False, False)
 
     def _killboard_lines(self, system: System) -> list[str]:
         """The killboard verdict for a system — it always says something.
@@ -235,11 +259,11 @@ class DetailPanel(VerticalScroll):
         title = f"[bold {RUST}]{system.name}[/bold {RUST}]"
         if current:
             title += f"  [{RUST}]◉ YOU ARE HERE[/{RUST}]"
-        lines = [title]
+        head = [title]
         is_root = path is not None and len(path) == 1
         if is_root and len(self.session.chain.roots) > 1:
             n = path[0] + 1
-            lines.append(
+            head.append(
                 f"[{MUTED}]fragment #{n} · "
                 f"[@click=app.sig_cmd('del')]discard[/][/{MUTED}]"
             )
@@ -252,8 +276,7 @@ class DetailPanel(VerticalScroll):
         if not is_root and system.name and not system.name.startswith("?"):
             actions.append(_link("strike", f"run_cmd('strike {system.name}')"))
         if actions:
-            lines.append(f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions))
-        lines.append("")
+            head.append(f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions))
         # Identity: class, statics, region — one tidy block.
         info = lookup_system(system.name)
         if system.jclass:
@@ -261,7 +284,7 @@ class DetailPanel(VerticalScroll):
             if isinstance(statics, (list, tuple)):
                 statics = " · ".join(statics)
             statics = f" [{MUTED}]· statics[/{MUTED}] {statics}" if statics else ""
-            lines.append(f"[{TEXT}]{system.jclass}{statics}[/{TEXT}]")
+            head.append(f"[{TEXT}]{system.jclass}{statics}[/{TEXT}]")
         if info is not None:
             extras = []
             if info.region:
@@ -269,26 +292,26 @@ class DetailPanel(VerticalScroll):
             if info.shattered:
                 extras.append("SHATTERED")
             if extras:
-                lines.append(f"[{MUTED}]{' · '.join(extras)}[/{MUTED}]")
+                head.append(f"[{MUTED}]{' · '.join(extras)}[/{MUTED}]")
         kinfo = self.session.kspace.get(system.name)
         if kinfo is not None:
             sec_color = {"H": TEXT, "L": WARN, "N": DIM}[kinfo.band]
-            lines.append(
+            head.append(
                 f"[{sec_color}]security {kinfo.sec_display}[/{sec_color}] "
                 f"[{MUTED}]· region {kinfo.region}[/{MUTED}]"
             )
         if system.effect:
-            lines.append(f"[{WARN}]{system.effect}[/{WARN}]")
+            head.append(f"[{WARN}]{system.effect}[/{WARN}]")
             if info is not None:
                 from vagari.parsers.catalog import effect_details
 
                 for attr, value in effect_details(
                     system.effect, info.class_key
                 ) or []:
-                    lines.append(
+                    head.append(
                         f"  [{MUTED}]{attr}[/{MUTED}] [{TEXT}]{value}[/{TEXT}]"
                     )
-        lines += ["", _rule("KILLBOARD")]
+        lines = [_rule("MATTERS OF DESTRUCTION")]
         lines += self._killboard_lines(system)
         act = []
         history = []
@@ -307,14 +330,18 @@ class DetailPanel(VerticalScroll):
             if len(history) >= 2:
                 act.append(f"  [{MUTED}]PvP trend, per recon sweep:[/{MUTED}]")
         if act:
-            lines += ["", _rule("ACTIVITY")] + act
-        lines.append("")
+            lines += ["", _rule("DISTURBANCES")] + act
+        sigs_header = self.query_one("#dossier-sigs-header", Static)
         if system.sigs:
-            lines.append(_rule(f"SIGNATURES · {len(system.sigs)}"))
+            sigs_header.update(
+                _rule(f"SIGNATURES OF RECORD · {len(system.sigs)}")
+            )
         else:
-            lines.append(_rule("SIGNATURES"))
-            lines.append(f"  [{MUTED}]none on record.[/{MUTED}]")
-        self.update("\n".join(lines))
+            sigs_header.update(
+                _rule("SIGNATURES OF RECORD")
+                + f"\n  [{MUTED}]none on record.[/{MUTED}]"
+            )
+        self.update("\n".join(lines), head="\n".join(head))
 
         from vagari.glyphs import kind_word
 
@@ -339,15 +366,17 @@ class DetailPanel(VerticalScroll):
                 "here", "", f"here — name or correct {system.name}"
             )
         self._extras(
-            False, len(history) >= 2, bool(system.sigs), form=current
+            False, len(history) >= 2, bool(system.sigs),
+            form=current, sigs_header=True,
         )
 
     def _show_sig(self, path: list, prefix: str) -> None:
         system = self.session.chain.system_at(path)
         sig = system.find_sig(prefix)
         if sig is None:
-            self.update(EMPTY_STATE)
-            self._extras(False, False, False)
+            # Struck or refiled from under us — fall back to its system.
+            self._showing = ("system", list(path))
+            self._show_system(system, list(path))
             return
         conn = system.find_connection(prefix)
         life = assess(conn) if conn is not None else None
@@ -385,11 +414,15 @@ class DetailPanel(VerticalScroll):
         if conn is None:
             actions.append(link("return", "return_selected"))
         action_row = f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions)
-        lines = [
-            f"[bold {RUST}]{sig.prefix}[/bold {RUST}] [{MUTED}]in {system.name}[/{MUTED}]",
+        spec = "/".join(str(p) for p in path)
+        self._head = [
+            f"[bold {RUST}]{sig.prefix}[/bold {RUST}] [{MUTED}]in "
+            f"[@click=app.open_system_dossier('{spec}')]{system.name}[/]"
+            f"[/{MUTED}]",
             action_row,
             f"[{TEXT}]{sig.group.value}[/{TEXT}] [{MUTED}]· signal {sig.signal:.1f}%[/{MUTED}]",
         ]
+        lines = []
         # The far side of the hole we came through: one wormhole, two sigs.
         if len(path) > 1:
             parent = self.session.chain.system_at(path[:-1])
@@ -432,7 +465,7 @@ class DetailPanel(VerticalScroll):
             if candidates:
                 info = lookup_system(system.name)
                 static_codes = set(info.statics) if info else set()
-                lines += ["", _rule("CANDIDATE TYPES")]
+                lines += ["", _rule("PLAUSIBLE DESIGNATIONS")]
                 for t in candidates[:10]:
                     if t.code == "K162":
                         lines.append(
@@ -453,7 +486,7 @@ class DetailPanel(VerticalScroll):
                     f"rare one, in the field below[/{DIM}]"
                 )
         if conn is not None:
-            lines += ["", _rule("WORMHOLE")]
+            lines += ["", _rule("THE PASSAGE")]
             lines.append(f"  [{MUTED}]leads to[/{MUTED}] "
                          f"[{TEXT}]{conn.child.name}[/{TEXT}]")
             wh_type = lookup_wh_type(conn.wh_type) if conn.wh_type else None
@@ -511,6 +544,8 @@ class DetailPanel(VerticalScroll):
             # Far-side intel, on this side of the hole — the whole point is
             # knowing what waits before splashing it.
             far = conn.child.name if conn.child.name else "?"
-            lines += ["", _rule(f"FAR SIDE · {far}")]
+            lines += ["", _rule(f"WHAT AWAITS · {far}")]
             lines += self._killboard_lines(conn.child)
-        self.update("\n".join(lines))
+        while lines and not lines[0]:
+            lines.pop(0)
+        self.update("\n".join(lines), head="\n".join(self._head))

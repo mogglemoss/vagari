@@ -112,7 +112,7 @@ async def test_detail_panel_shows_activity(tmp_path):
         panel = app.query_one(DetailPanel)
         panel.show_node(("system", [0]))
         text = str(panel.content)
-        assert "ACTIVITY" in text and "3 ship" in text
+        assert "DISTURBANCES" in text and "3 ship" in text
 
 
 @pytest.mark.asyncio
