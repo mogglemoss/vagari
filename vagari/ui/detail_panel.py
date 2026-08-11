@@ -51,6 +51,7 @@ class DetailPanel(VerticalScroll):
         self.session = session
         self.table_path: list = [0]
         self._form_wrap: tuple[str, str] | None = None
+        self._showing: tuple | None = None
 
     def compose(self) -> ComposeResult:
         yield Static(EMPTY_STATE, id="dossier-body")
@@ -101,7 +102,12 @@ class DetailPanel(VerticalScroll):
         before, after = self._form_wrap
         self.app.submit_text(f"{before} {value}{after}".strip())
 
+    def reshow(self) -> None:
+        """Re-render the current subject — for async enrichment landing."""
+        self.show_node(self._showing)
+
     def show_node(self, data: tuple | None) -> None:
+        self._showing = data
         if data is None:
             self.update(EMPTY_STATE)
             self._extras(False, False, False)
@@ -143,12 +149,14 @@ class DetailPanel(VerticalScroll):
                 f"[{sec_color}]security {kinfo.sec_display}[/{sec_color}] "
                 f"[{MUTED}]· region {kinfo.region}[/{MUTED}]"
             )
-        zstats = None
-        if kinfo is not None:
-            zstats = self.session.zkill_stats.get(kinfo.system_id)
         info = lookup_system(system.name)
-        if info is not None and zstats is None:
-            zstats = self.session.zkill_stats.get(info.system_id)
+        system_id = kinfo.system_id if kinfo is not None else (
+            info.system_id if info is not None else None
+        )
+        zstats = (
+            self.session.zkill_stats.get(system_id)
+            if system_id is not None else None
+        )
         if zstats is not None:
             from vagari.enrichers.zkill import human_isk
 
@@ -162,8 +170,8 @@ class DetailPanel(VerticalScroll):
                     f"[{MUTED}]ACTIVE: {s.active_characters} hunters · "
                     f"{s.active_ships} hull types recently[/{MUTED}]"
                 )
-            if zstats.last_kill is not None:
-                lk = zstats.last_kill
+            lk = zstats.last_kill
+            if lk is not None:
                 when = f"{age_text(lk.time)} ago" if lk.time else "recently"
                 color = WARN if lk.time and (
                     (utcnow() - lk.time).total_seconds() < 3600
@@ -172,6 +180,34 @@ class DetailPanel(VerticalScroll):
                     f"[{color}]LAST KILL: {when} — {lk.ship_name}, "
                     f"{lk.attackers} attacker{'s' if lk.attackers != 1 else ''}"
                     f" · {human_isk(lk.isk)} ISK[/{color}]"
+                )
+            else:
+                lines.append(
+                    f"[{MUTED}]LAST KILL: none on record — ever.[/{MUTED}]"
+                )
+            day_old = lk is not None and lk.time is not None and (
+                (utcnow() - lk.time).total_seconds() < 86400
+            )
+            if not day_old:
+                lines.append(
+                    f"[{DIM}]QUIET — nothing destroyed here in the last "
+                    f"day. The Bureau declines to be reassured.[/{DIM}]"
+                )
+        elif system_id is not None:
+            dispatched = False
+            hook = getattr(self.app, "maybe_fetch_intel", None)
+            if hook is not None:
+                dispatched = hook(system.name, system_id)
+            if dispatched:
+                lines.append(
+                    f"[{MUTED}]KILLBOARD: inquiry dispatched — awaiting "
+                    f"the void's reply…[/{MUTED}]"
+                )
+            else:
+                lines.append(
+                    f"[{MUTED}]KILLBOARD: nothing on file · "
+                    f"[@click=app.fetch_intel({system_id}, '{system.name}')]"
+                    f"inquire[/][/{MUTED}]"
                 )
         if system.effect and info is not None:
             from vagari.parsers.catalog import effect_details

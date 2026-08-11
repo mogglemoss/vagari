@@ -291,3 +291,75 @@ async def test_sig_cmd_qualifies_remote_selection(tmp_path):
         app.action_sig_cmd("flag")
         await pilot.pause()
         assert app.session.chain.root.find_sig("FIY").flagged
+
+
+@pytest.mark.asyncio
+async def test_killboard_section_always_present(tmp_path):
+    """The dossier never stays mute on killboard matters: stats, a quiet
+    verdict, or an inquiry line — always something."""
+    from datetime import timedelta
+
+    from vagari.enrichers.zkill import LastKill, SystemIntel
+    from vagari.model.chain import utcnow
+    from vagari.parsers.catalog import lookup_system
+
+    app = make_app(tmp_path)  # recon disabled: no auto-inquiry
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("system", [0]))
+        await pilot.pause()
+        text = str(panel.content)
+        assert "KILLBOARD: nothing on file" in text
+        assert "@click=app.fetch_intel(" in text
+
+        sid = lookup_system("J105443").system_id
+        # An old kill: details still shown, plus the quiet verdict.
+        app.session.zkill_stats[sid] = SystemIntel(
+            stats=None,
+            last_kill=LastKill(
+                time=utcnow() - timedelta(days=3),
+                ship_name="Heron", attackers=2, isk=5_000_000.0,
+            ),
+        )
+        panel.show_node(("system", [0]))
+        text = str(panel.content)
+        assert "LAST KILL: 3d ago — Heron" in text
+        assert "QUIET" in text
+
+        # No kill on record at all.
+        app.session.zkill_stats[sid] = SystemIntel(stats=None, last_kill=None)
+        panel.show_node(("system", [0]))
+        text = str(panel.content)
+        assert "LAST KILL: none on record" in text and "QUIET" in text
+
+
+@pytest.mark.asyncio
+async def test_dossier_auto_intel(tmp_path, monkeypatch):
+    """Opening a dossier dispatches the killboard inquiry itself — once."""
+    from vagari.enrichers import zkill
+
+    calls = []
+
+    async def fake_fetch(system_id):
+        calls.append(system_id)
+        return zkill.SystemIntel(
+            stats=zkill.SystemKillStats(42, 9_000_000_000.0, 3, 2),
+            last_kill=None,
+        )
+
+    monkeypatch.setattr(zkill, "fetch_system_intel", fake_fetch)
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.recon_enabled = True  # flipped late so startup stays offline
+        panel = app.query_one(DetailPanel)
+        panel.show_node(("system", [0]))
+        await pilot.pause()
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        text = str(panel.content)
+        assert "42 ships" in text and "9.0B" in text
+        panel.show_node(("system", [0]))
+        await pilot.pause()
+        assert len(calls) == 1  # answered: no second inquiry

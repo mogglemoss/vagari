@@ -88,6 +88,8 @@ class MapperApp(App):
         self.recon_enabled = recon    # tests disable the network fetch
         self.follow_enabled = follow  # tests disable the chatlog tailer
         self._search: tuple[str, int] | None = None  # (query, match index)
+        self._intel_requested: set[int] = set()  # auto-inquiries this session
+        self._intel_failed: set[int] = set()
 
     def get_system_commands(self, screen):
         """The palette is generated from the command registry — same truth
@@ -406,16 +408,47 @@ class MapperApp(App):
         self.status(f"Requesting killboard intel for {current.name}…")
         self.run_worker(self._fetch_intel(current.name, system_id), group="intel")
 
-    async def _fetch_intel(self, name: str, system_id: int) -> None:
+    def action_fetch_intel(self, system_id: int, name: str = "") -> None:
+        """Dossier link: killboard inquiry for the shown system — which
+        need not be the one ◉ YOU occupies."""
+        self.status(f"Requesting killboard intel for {name or system_id}…")
+        self.run_worker(self._fetch_intel(name or "?", int(system_id)), group="intel")
+
+    def maybe_fetch_intel(self, name: str, system_id: int) -> bool:
+        """Auto-inquiry when a dossier opens: at most one per system per
+        session. True while an inquiry is out; False if answered, failed
+        (the dossier offers a retry link), or recon is disabled."""
+        if not self.recon_enabled or system_id in self.session.zkill_stats:
+            return False
+        if system_id in self._intel_failed:
+            return False
+        if system_id in self._intel_requested:
+            return True
+        self._intel_requested.add(system_id)
+        self.run_worker(
+            self._fetch_intel(name, system_id, announce=False), group="intel"
+        )
+        return True
+
+    async def _fetch_intel(
+        self, name: str, system_id: int, announce: bool = True
+    ) -> None:
         from vagari.enrichers.zkill import fetch_system_intel, human_isk
 
         intel = await fetch_system_intel(system_id)
         if intel is None:
-            self.status("zKillboard unavailable. The Bureau does not speculate offline.")
+            self._intel_failed.add(system_id)
+            self.query_one(DetailPanel).reshow()
+            if announce:
+                self.status(
+                    "zKillboard unavailable. The Bureau does not speculate offline."
+                )
             return
+        self._intel_failed.discard(system_id)
         self.session.zkill_stats[system_id] = intel
-        node = self.query_one(ChainTree).cursor_node
-        self.query_one(DetailPanel).show_node(node.data if node else None)
+        self.query_one(DetailPanel).reshow()
+        if not announce:
+            return
         bits = []
         if intel.stats:
             bits.append(

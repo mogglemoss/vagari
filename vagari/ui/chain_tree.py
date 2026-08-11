@@ -27,12 +27,16 @@ STALE_HOURS = 6        # dimmed once unconfirmed this long
 
 
 def age_text(since: datetime, now: datetime | None = None) -> str:
-    """'3h12m' style age."""
+    """'3h12m' style age; whole days past 48h — killboard silences can
+    run to months, and '1460h00m' informs nobody."""
     delta = (now or utcnow()) - since
     minutes = int(delta.total_seconds() // 60)
     if minutes < 60:
         return f"{minutes}m"
-    return f"{minutes // 60}h{minutes % 60:02d}m"
+    hours = minutes // 60
+    if hours < 48:
+        return f"{hours}h{minutes % 60:02d}m"
+    return f"{hours // 24}d"
 
 
 def _visible(sig: Signature, view: str) -> bool:
