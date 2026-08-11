@@ -397,3 +397,33 @@ async def test_wormhole_sig_shows_far_side_killboard(tmp_path):
         app.session.follow("?")
         panel.show_node(("sig", [0], "QLM"))
         assert "FAR SIDE" in str(panel.content)
+
+
+@pytest.mark.asyncio
+async def test_tick_relabels_in_place(tmp_path):
+    """The minute tick advances ages without tearing the tree down —
+    same nodes, fresh labels, no flicker-inducing clear()."""
+    from datetime import timedelta
+
+    from vagari.model.chain import utcnow
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.session.execute("qlm J154535")
+        app.refresh_all()
+        await pilot.pause()
+        tree = app.query_one(ChainTree)
+        assert tree.move_to_data(("sig", [0], "FIY"))
+        node_before = tree.cursor_node
+        spans_before = list(node_before.label.spans)
+
+        for sig in app.session.chain.root.sigs:
+            sig.last_seen = utcnow() - timedelta(hours=72)  # past STALE_HOURS
+        app._tick()
+        await pilot.pause()
+
+        # Same node object — labels updated in place, no clear()/re-add.
+        assert tree.cursor_node is node_before
+        # Staleness is a color: the freshness dot's span changed style.
+        assert list(node_before.label.spans) != spans_before

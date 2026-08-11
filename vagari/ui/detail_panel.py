@@ -311,7 +311,6 @@ class DetailPanel(VerticalScroll):
         lines.append("")
         if system.sigs:
             lines.append(_rule(f"SIGNATURES · {len(system.sigs)}"))
-            lines.append(f"  [{DIM}]click a row to select[/{DIM}]")
         else:
             lines.append(_rule("SIGNATURES"))
             lines.append(f"  [{MUTED}]none on record.[/{MUTED}]")

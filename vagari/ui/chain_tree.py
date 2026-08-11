@@ -222,6 +222,69 @@ class ChainTree(Tree):
         walk(self.root)
         return collapsed
 
+    def _root_suffix(self, ri: int, fragment: System) -> str:
+        adrift = ""
+        if len(self.session.chain.roots) > 1:
+            adrift = f" [{DIM}]#{ri + 1}[/{DIM}]"
+        if fragment.adrift_since is not None:
+            adrift += (
+                f" [{DIM}]· adrift {age_text(fragment.adrift_since)}[/{DIM}]"
+            )
+        elif ri > 0:
+            adrift += f" [{DIM}]· adrift[/{DIM}]"
+        return adrift
+
+    def _label_for(self, data: tuple) -> str | None:
+        """Recompute the label a node would get today, from its data alone.
+        None when the record no longer holds what the node shows."""
+        chain = self.session.chain
+        if data[0] == "system":
+            path = data[1]
+            try:
+                system = chain.system_at(path)
+            except Exception:
+                return None
+            label = system_label(
+                system, here=chain.location == list(path),
+                kinfo=self.session.kspace.get(system.name),
+                pilots=self._fleet(system.name),
+            )
+            if len(path) == 1:
+                label += self._root_suffix(path[0], system)
+            return label
+        path, prefix = data[1], data[2]
+        try:
+            system = chain.system_at(path)
+        except Exception:
+            return None
+        sig = system.find_sig(prefix)
+        if sig is None:
+            return None
+        conn = system.find_connection(prefix)
+        if conn is not None:
+            return sig_label(sig, conn)
+        if len(path) > 1:
+            parent = chain.system_at(path[:-1])
+            via = parent.find_connection(path[-1])
+            if via is not None and via.return_prefix == prefix:
+                return return_label(sig, parent.name)
+        return sig_label(sig, None)
+
+    def retick(self) -> None:
+        """Advance every age and countdown by refreshing labels in place.
+        No clear, no re-add, no scroll jump — the minute tick must not
+        flicker the map."""
+
+        def relabel(node) -> None:
+            if node.data is not None:
+                label = self._label_for(node.data)
+                if label is not None:
+                    node.set_label(label)
+            for child in node.children:
+                relabel(child)
+
+        relabel(self.root)
+
     def rebuild(self) -> None:
         chain = self.session.chain
         cursor_data = self.cursor_node.data if self.cursor_node else None
@@ -230,20 +293,11 @@ class ChainTree(Tree):
         self.root.set_label(f"[{MUTED}]chain {chain.name}[/{MUTED}]")
         self.root.data = None
         for ri, fragment in enumerate(chain.roots):
-            adrift = ""
-            if len(chain.roots) > 1:
-                adrift = f" [{DIM}]#{ri + 1}[/{DIM}]"
-            if fragment.adrift_since is not None:
-                adrift += (
-                    f" [{DIM}]· adrift {age_text(fragment.adrift_since)}[/{DIM}]"
-                )
-            elif ri > 0:
-                adrift += f" [{DIM}]· adrift[/{DIM}]"
             node = self.root.add(
                 system_label(fragment, here=chain.location == [ri],
                              kinfo=self.session.kspace.get(fragment.name),
                              pilots=self._fleet(fragment.name))
-                + adrift,
+                + self._root_suffix(ri, fragment),
                 data=("system", [ri]),
             )
             self._fill(node, fragment, [ri])

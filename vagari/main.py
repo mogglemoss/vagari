@@ -203,8 +203,9 @@ class MapperApp(App):
             self._after_engine(message)
 
     def _tick(self) -> None:
-        if not isinstance(self.focused, Input):
-            self.refresh_all()
+        # Ages and countdowns advance by relabeling in place — a full
+        # rebuild every minute flickered the whole map.
+        self.query_one(ChainTree).retick()
 
     async def _refresh_activity(self) -> None:
         activity = await fetch_system_kills()
@@ -232,6 +233,12 @@ class MapperApp(App):
     # -- refresh -------------------------------------------------------------
 
     def refresh_all(self) -> None:
+        # One paint at the end — clear-and-refill must never flash an
+        # empty frame.
+        with self.batch_update():
+            self._refresh_all()
+
+    def _refresh_all(self) -> None:
         tree = self.query_one(ChainTree)
         tree.rebuild()
         view = self.session.view
