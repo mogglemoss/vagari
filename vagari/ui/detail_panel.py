@@ -106,6 +106,13 @@ class DetailPanel(VerticalScroll):
         """Re-render the current subject — for async enrichment landing."""
         self.show_node(self._showing)
 
+    def ensure_subject(self, data: tuple) -> None:
+        """Re-render; adopt `data` as the subject first if there is none.
+        Enrichment must land somewhere visible, never on a blank form."""
+        if self._showing is None:
+            self._showing = data
+        self.reshow()
+
     def show_node(self, data: tuple | None) -> None:
         self._showing = data
         if data is None:

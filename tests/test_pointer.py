@@ -363,3 +363,15 @@ async def test_dossier_auto_intel(tmp_path, monkeypatch):
         panel.show_node(("system", [0]))
         await pilot.pause()
         assert len(calls) == 1  # answered: no second inquiry
+
+
+@pytest.mark.asyncio
+async def test_dossier_opens_on_you(tmp_path):
+    """The instrument opens with ◉ YOU's dossier on display, not a blank
+    form — enrichment must have somewhere visible to land."""
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        panel = app.query_one(DetailPanel)
+        assert panel._showing == ("system", [0])
+        assert "J105443" in str(panel.content)

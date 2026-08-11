@@ -150,6 +150,11 @@ class MapperApp(App):
         # keystroke replaces the fzf-seeded character.
         self.query_one("#command-bar", Input).select_on_focus = False
         self.refresh_all()
+        # Open on ◉ YOU, dossier and all — never on a blank form. This is
+        # also what arms the auto killboard inquiry for the current system.
+        self.query_one(ChainTree).move_to_data(
+            ("system", list(self.session.chain.location))
+        )
         hint = self.session.orientation_hint()
         if hint:
             self.status(hint)
@@ -446,7 +451,9 @@ class MapperApp(App):
             return
         self._intel_failed.discard(system_id)
         self.session.zkill_stats[system_id] = intel
-        self.query_one(DetailPanel).reshow()
+        self.query_one(DetailPanel).ensure_subject(
+            ("system", list(self.session.chain.location))
+        )
         if not announce:
             return
         bits = []
