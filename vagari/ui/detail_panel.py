@@ -265,7 +265,7 @@ class DetailPanel(VerticalScroll):
             n = path[0] + 1
             head.append(
                 f"[{MUTED}]fragment #{n} · "
-                f"[@click=app.sig_cmd('del')]discard[/][/{MUTED}]"
+                f"[@click=app.sig_cmd('del')]strike[/][/{MUTED}]"
             )
         actions = []
         if not current:

@@ -62,7 +62,8 @@ REGISTRY: list[Command] = [
     Command("flag", "flag abc", "flag a signature for attention", "record",
             keys="x"),
     Command("strike", "strike abc · strike vard · strike #2",
-            "strike a signature or a whole fragment (strike! forces)",
+            "expunge a sig, system, or fragment from the record (strike! "
+            "forces; del and discard are the same verb, older spellings)",
             "record", keys="d", aliases=("del", "del!", "discard", "discard!",
                                          "strike!")),
     Command("eol", "eol abc", "toggle end-of-life; the 4h clock runs from "
@@ -79,8 +80,8 @@ REGISTRY: list[Command] = [
     Command("", "(the dossier)", "its filing field and action links accept "
             "this same grammar, pre-addressed to the selection", "record"),
     # the forest
-    Command("sever", "sever abc", "collapsed hole: far side becomes an "
-            "adrift fragment, kept not lost", "forest"),
+    Command("sever", "sever abc", "the opposite of strike: cut the hole "
+            "but KEEP the far side as an adrift fragment", "forest"),
     Command("fragment", "fragment [name]", "file a disconnected fragment "
             "(or a pending arrival)", "forest"),
     Command("k162", "k162 [abc] · k abc", "file a pending arrival through "

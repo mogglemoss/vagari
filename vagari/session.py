@@ -535,12 +535,12 @@ class Session:
         if len(self.chain.roots) == 1:
             raise ChainError("this is the only fragment — the map must map something")
         if self.chain.location[0] == ri:
-            raise ChainError("you are inside that fragment — leave before discarding")
+            raise ChainError("you are inside that fragment — leave before striking it")
         fragment = self.chain.roots[ri]
         if (fragment.sigs or fragment.connections) and not force:
             raise ChainError(
                 f"fragment #{ri + 1} ({fragment.name}) still has mapped content "
-                "— `discard!` to force"
+                "— `strike!` to force"
             )
         self.chain.roots.pop(ri)
         if self.chain.location[0] > ri:

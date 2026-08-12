@@ -132,7 +132,7 @@ def test_discard_guards_content(session):
         )
     )
     session.chain.location = [0]
-    assert "discard!" in session.execute("discard 2")
+    assert "strike!" in session.execute("discard 2")
     assert "struck" in session.execute("discard! 2")
 
 
