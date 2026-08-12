@@ -4,7 +4,7 @@ action row, typeahead, candidate types, five views."""
 import pytest
 from textual.widgets import Static, Tree
 
-from tests.test_app import make_app, paste, tree_text
+from tests.test_app import dossier_text, make_app, paste, tree_text
 from vagari.ui.chain_tree import ChainTree
 from vagari.ui.detail_panel import DetailPanel
 
@@ -91,7 +91,7 @@ async def test_candidate_types_for_untyped_hole(tmp_path):
         await paste(app, pilot, "paste_mixed.txt")
         panel = app.query_one(DetailPanel)
         panel.show_node(("sig", [0], "QLM"))  # wormhole, never typed
-        text = str(panel.content)
+        text = dossier_text(panel)
         assert "PLAUSIBLE DESIGNATIONS" in text
         assert "static" in text  # the system's static is marked
         assert "K162" in text and "inbound" in text  # the eternal candidate
@@ -314,9 +314,9 @@ async def test_killboard_section_always_present(tmp_path):
         panel = app.query_one(DetailPanel)
         panel.show_node(("system", [0]))
         await pilot.pause()
-        text = str(panel.content)
+        text = dossier_text(panel)
         assert "nothing on file" in text
-        assert "@click=app.fetch_intel(" in text
+        assert "@click=app.fetch_intel(" in str(panel.content)
 
         sid = lookup_system("J105443").system_id
         # An old kill: details still shown, plus the quiet verdict.
@@ -328,14 +328,14 @@ async def test_killboard_section_always_present(tmp_path):
             ),
         )
         panel.show_node(("system", [0]))
-        text = str(panel.content)
+        text = dossier_text(panel)
         assert "LAST KILL: 3d ago — Heron" in text
         assert "QUIET" in text
 
         # No kill on record at all.
         app.session.zkill_stats[sid] = SystemIntel(stats=None, last_kill=None)
         panel.show_node(("system", [0]))
-        text = str(panel.content)
+        text = dossier_text(panel)
         assert "LAST KILL: none on record" in text and "QUIET" in text
 
 

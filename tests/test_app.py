@@ -36,6 +36,14 @@ def tree_text(tree: ChainTree) -> str:
     return "\n".join(parts)
 
 
+def dossier_text(panel) -> str:
+    """Plain dossier text with whitespace collapsed — assertions must not
+    care where the hanging-indent wrap broke a line."""
+    from rich.text import Text
+
+    return " ".join(Text.from_markup(str(panel.content)).plain.split())
+
+
 async def paste(app, pilot, name: str) -> None:
     app.post_message(events.Paste((FIXTURES / name).read_text()))
     await pilot.pause()
@@ -283,7 +291,7 @@ async def test_wormhole_type_mass_in_detail(tmp_path):
         await pilot.pause()
         panel = app.query_one(DetailPanel)
         panel.show_node(("sig", [0], "QLM"))
-        text = str(panel.content)
+        text = dossier_text(panel)
         assert "N110" in text and "per jump ≤" in text and "total" in text
 
 
@@ -355,7 +363,7 @@ async def test_kspace_rendering(tmp_path):
         )
         panel = app.query_one(DetailPanel)
         panel.show_node(("system", [0, "ZAA"]))
-        text = str(panel.content)
+        text = dossier_text(panel)
         assert "security 0.9" in text and "The Forge" in text
         assert "1,538,343" in text and "177.4T" in text
         assert "LAST KILL" in text and "Capsule" in text and "12.4M" in text

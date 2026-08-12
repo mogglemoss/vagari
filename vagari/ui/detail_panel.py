@@ -27,6 +27,35 @@ def _link(label: str, action: str, color: str = MUTED) -> str:
     return f"[{color}][@click=app.{action}]{label}[/][/{color}]"
 
 
+def _wrap_markup(markup: str, width: int) -> str:
+    """Wrap long lines with a hanging indent so continuations stay inside
+    their section instead of snapping to column 0. Lines carrying @click
+    actions are left to Textual — Rich's markup round-trip drops the meta
+    and would kill the link."""
+    if width < 20:
+        return markup
+    from rich.console import Console
+    from rich.text import Text as RichText
+
+    console = Console(width=width)
+    out = []
+    for line in markup.split("\n"):
+        if not line or "@click" in line:
+            out.append(line)
+            continue
+        text = RichText.from_markup(line)
+        if len(text.plain) <= width:
+            out.append(line)
+            continue
+        indent = len(text.plain) - len(text.plain.lstrip())
+        hang = " " * (indent + 2)
+        pieces = text.wrap(console, max(16, width - len(hang)))
+        out.append(pieces[0].markup)
+        for piece in pieces[1:]:
+            out.append(hang + piece.markup)
+    return "\n".join(out)
+
+
 def _rule(title: str) -> str:
     """A section rule: ── TITLE ─────────"""
     bar = "─" * max(3, 26 - len(title))
@@ -68,8 +97,8 @@ class DetailPanel(VerticalScroll):
         # section happens to end the body.
         yield Static("", id="dossier-head")
         yield Input(id="dossier-form")
-        yield Static(EMPTY_STATE, id="dossier-body")
         yield Digits("", id="dossier-eol")
+        yield Static(EMPTY_STATE, id="dossier-body")
         yield Sparkline([], id="dossier-trend")
         yield Static("", id="dossier-sigs-header")
         yield DataTable(id="dossier-sigs")
@@ -88,9 +117,18 @@ class DetailPanel(VerticalScroll):
         return f"{head}\n{body}" if head else str(body)
 
     def update(self, markup: str, head: str = "") -> None:
-        self.query_one("#dossier-head", Static).update(head)
+        width = self.content_region.width
+        self.query_one("#dossier-head", Static).update(
+            _wrap_markup(head, width)
+        )
         self.query_one("#dossier-head", Static).display = bool(head)
-        self.query_one("#dossier-body", Static).update(markup)
+        self.query_one("#dossier-body", Static).update(
+            _wrap_markup(markup, width)
+        )
+
+    def on_resize(self) -> None:
+        if self._showing is not None:
+            self.reshow()  # re-fit the hanging-indent wrapping
 
     def _extras(
         self, eol: bool, trend: bool, table: bool,
@@ -407,7 +445,9 @@ class DetailPanel(VerticalScroll):
             if system.name and not system.name.startswith("?")
             else ""
         )
-        if sig.group is SigGroup.WORMHOLE:
+        if sig.group is SigGroup.WORMHOLE and conn is not None and conn.wh_type:
+            hint = f"{sig.prefix} — label · or a corrected type code"
+        elif sig.group is SigGroup.WORMHOLE:
             hint = f"{sig.prefix} — type (K162 · H296) · destination (J105443) · label"
         else:
             hint = f"{sig.prefix} — label this signature, filed verbatim"
