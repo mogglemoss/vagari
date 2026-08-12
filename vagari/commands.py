@@ -22,7 +22,7 @@ class Command:
 
 CATEGORIES = [
     ("drive", "how to drive it"),
-    ("deposits", "deposits"),
+    ("scanning", "scanning"),
     ("navigation", "navigation"),
     ("record", "the record"),
     ("forest", "the forest"),
@@ -32,12 +32,13 @@ CATEGORIES = [
 ]
 
 REGISTRY: list[Command] = [
-    # drive (prose rendered specially by the reference screen)
-    # deposits
-    Command("", "paste", "deposit scan telemetry; despawn candidates are "
-            "reported every time", "deposits"),
-    Command("sweep", "sweep", "strike every reported despawn (collapsed holes "
-            "with children sever)", "deposits", keys="s",
+    # drive (rendered from the reference screen's extra pairs)
+    # scanning
+    Command("", "paste", "file scan results — new sigs are added, sigs "
+            "missing from a fresh scan are reported as despawn candidates; "
+            "nothing is deleted", "scanning"),
+    Command("sweep", "sweep", "strike every reported despawn (collapsed "
+            "holes with children sever)", "scanning", keys="s",
             palette="Sweep despawned", action="sweep"),
     # navigation
     Command("nav", "nav abc …", "proceed through wormhole ABC", "navigation"),
@@ -45,9 +46,9 @@ REGISTRY: list[Command] = [
             keys="u"),
     Command("top", "top", "return to the fragment root", "navigation",
             keys="g", palette="Return to root", action="go_top"),
-    Command("home", "home", "the route home, door by door", "navigation",
-            keys="h", palette="Homeward", action="show_homeward",
-            aliases=("route",)),
+    Command("home", "home", "retrace the route to the root, door by door",
+            "navigation", keys="h", palette="Homeward",
+            action="show_homeward", aliases=("route",)),
     Command("", "y", "cursor to ◉ YOU", "navigation", keys="y"),
     # the record
     Command("", "abc J105443", "open ABC to a catalogued system (a fragment's "
@@ -108,8 +109,7 @@ REGISTRY: list[Command] = [
             "activity", action="recon"),
     Command("intel", "intel", "zKill dossier for the current system",
             "follow", palette="Intel: zKill dossier", action="request_intel"),
-    # meta
-    Command("", "Tab / :", "to the submission line and back", "meta"),
+    # meta ("Tab / :" lives under "how to drive it" on the reference screen)
     Command("", "?", "this reference", "meta", keys="?",
             palette="Reference", action="show_help"),
     Command("", "a", "about — the instrument's papers", "meta", keys="a",
