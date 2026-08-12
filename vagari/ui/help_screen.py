@@ -43,6 +43,23 @@ _LEGEND = (
     f"  [{_MUTED}]≈ gas  ▪ ore  · unresolved  ![/{_MUTED}] flagged"
 )
 
+_PROCEDURE = [
+    "undock and jump — your first system names the root",
+    "paste probe-scanner rows; anywhere, any time",
+    "a first scan's lone hole pairs itself as your return",
+    "type a hole (xpa Z060) or click a candidate in its dossier",
+    "jump it — the map follows; a sole scanned hole files itself",
+    "scan · jump · repeat — sweep strikes despawns, home leads back",
+]
+
+
+def _rule_line(title: str) -> str:
+    bar = "─" * max(3, 40 - len(title))
+    return (
+        f"[{_LINE}]──[/{_LINE}] [bold {_MUTED}]{title}[/bold {_MUTED}] "
+        f"[{_LINE}]{bar}[/{_LINE}]"
+    )
+
 
 def _escape(text: str) -> str:
     """Literal brackets in grammar ('fragment [name]') must not be tags."""
@@ -55,7 +72,7 @@ def _entry_lines(grammar: str, keys: str, help_text: str) -> list[str]:
     if keys:
         head += f" · {keys}"
     wrapped = textwrap.wrap(help_text, _HELP_WIDTH) or [""]
-    pad = " " * (_GRAMMAR_WIDTH + 2)
+    pad = " " * (_GRAMMAR_WIDTH + 3)
     lines = []
     if len(head) <= _GRAMMAR_WIDTH:
         lines.append(
@@ -73,13 +90,19 @@ def _entry_lines(grammar: str, keys: str, help_text: str) -> list[str]:
 
 def build_reference() -> str:
     out = [
-        f"[bold {_RUST}]ANOIKIS CARTOGRAPHIC BUREAU[/bold {_RUST}]"
-        f"  [{_MUTED}]instrument reference[/{_MUTED}]",
+        f"[bold {_RUST}]ANOIKIS CARTOGRAPHIC BUREAU[/bold {_RUST}]",
+        f"[{_MUTED}]Department of Spatial Relations · instrument "
+        f"reference[/{_MUTED}]",
+        "",
+        _rule_line("field procedure"),
     ]
+    for n, step in enumerate(_PROCEDURE, 1):
+        out.append(
+            f"  [{_RUST}]{n}[/{_RUST}]  [{_TEXT}]{_escape(step)}[/{_TEXT}]"
+        )
     for key, title in CATEGORIES:
         out.append("")
-        rule = "─" * (40 - len(title))
-        out.append(f"[{_LINE}]── {title} {rule}[/{_LINE}]")
+        out.append(_rule_line(title))
         if key in _PROSE:
             out.append(_PROSE[key])
         for c in REGISTRY:
@@ -88,7 +111,7 @@ def build_reference() -> str:
             out.extend(_entry_lines(c.grammar, c.keys, c.help))
         if key == "record":
             out.append("")
-            out.append(f"[{_LINE}]── the legend ─────────────────────────[/{_LINE}]")
+            out.append(_rule_line("the legend"))
             out.append(_LEGEND)
     out.append("")
     out.append(

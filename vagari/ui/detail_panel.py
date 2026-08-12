@@ -314,16 +314,19 @@ class DetailPanel(VerticalScroll):
             )
         if system.effect:
             head.append(f"[{WARN}]{system.effect}[/{WARN}]")
-            if info is not None:
-                from vagari.parsers.catalog import effect_details
+        lines = []
+        if system.effect and info is not None:
+            from vagari.parsers.catalog import effect_details
 
-                for attr, value in effect_details(
-                    system.effect, info.class_key
-                ) or []:
-                    head.append(
+            details = effect_details(system.effect, info.class_key) or []
+            if details:
+                lines.append(_rule("LOCAL CONDITIONS"))
+                for attr, value in details:
+                    lines.append(
                         f"  [{MUTED}]{attr}[/{MUTED}] [{TEXT}]{value}[/{TEXT}]"
                     )
-        lines = [_rule("MATTERS OF DESTRUCTION")]
+                lines.append("")
+        lines.append(_rule("MATTERS OF DESTRUCTION"))
         lines += self._killboard_lines(system)
         act = []
         history = []
@@ -434,12 +437,24 @@ class DetailPanel(VerticalScroll):
             action_row,
             f"[{TEXT}]{sig.group.value}[/{TEXT}] [{MUTED}]· signal {sig.signal:.1f}%[/{MUTED}]",
         ]
+        if sig.name:
+            self._head.append(f"[{TEXT}]{sig.name}[/{TEXT}]")
+        if sig.label:
+            self._head.append(f"[{WARN}]“{sig.label}”[/{WARN}]")
+        if sig.flagged:
+            self._head.append(f"[bold {WARN}]FLAGGED FOR ATTENTION[/bold {WARN}]")
+        self._head.append(
+            f"[{MUTED}]first noted {age_text(sig.first_seen)} ago · "
+            f"last confirmed {age_text(sig.last_seen)} ago[/{MUTED}]"
+        )
         lines = []
         # The far side of the hole we came through: one wormhole, two sigs.
+        is_return = False
         if len(path) > 1:
             parent = self.session.chain.system_at(path[:-1])
             via = parent.find_connection(path[-1])
             if via is not None and via.return_prefix == sig.prefix:
+                is_return = True
                 pair = f"{via.wh_type} " if via.wh_type else ""
                 lines.append(
                     f"[bold {RUST}]RETURN[/bold {RUST}] [{MUTED}]— the far side "
@@ -453,33 +468,38 @@ class DetailPanel(VerticalScroll):
                         f"[{DIM}]— if this is not the way home; `return "
                         f"<sig>` names the true one[/{DIM}]"
                     )
-        if sig.name:
-            lines.append(f"[{TEXT}]{sig.name}[/{TEXT}]")
-        if sig.label:
-            lines.append(f"[{WARN}]“{sig.label}”[/{WARN}]")
-        if sig.flagged:
-            lines.append(f"[bold {WARN}]FLAGGED FOR ATTENTION[/bold {WARN}]")
-        lines.append(
-            f"[{MUTED}]first noted {age_text(sig.first_seen)} ago · "
-            f"last confirmed {age_text(sig.last_seen)} ago[/{MUTED}]"
-        )
+                # A code typed here would open the hole OUTBOUND — the
+                # return's true type is filed with `return <sig> <code>`.
+                self._arm_form(
+                    sig.prefix.lower(), qualifier,
+                    f"{sig.prefix} — label only; type it via "
+                    f"`return {sig.prefix.lower()} B274`",
+                )
         verdict = classify_site(sig.group, sig.name)
         if verdict is not None:
-            lines.append("")
             badge_color = RUST if verdict.hazard else TEXT
+            if lines:
+                lines.append("")
+            lines.append(_rule("SITE ASSESSMENT"))
             lines.append(
-                f"[bold {badge_color}]{verdict.label}[/bold {badge_color}] "
+                f"  [bold {badge_color}]{verdict.label}[/bold {badge_color}] "
                 f"[{MUTED}]{verdict.note}[/{MUTED}]"
             )
             if verdict.worth:
-                lines.append(f"[{MUTED}]Worth: {verdict.worth}[/{MUTED}]")
+                lines.append(f"  [{MUTED}]worth: {verdict.worth}[/{MUTED}]")
             clouds = gas_contents(sig.name)
             if clouds:
                 contents = " · ".join(f"{c.units:,} × {c.gas}" for c in clouds)
-                lines.append(f"[{TEXT}]{contents}[/{TEXT}]")
+                lines.append(f"  [{TEXT}]{contents}[/{TEXT}]")
         from vagari.parsers.catalog import candidate_types
 
-        if sig.group is SigGroup.WORMHOLE and (conn is None or not conn.wh_type):
+        # A paired return's designation reads from the parent's side — the
+        # generic candidate list would only mislead here.
+        if (
+            sig.group is SigGroup.WORMHOLE
+            and not is_return
+            and (conn is None or not conn.wh_type)
+        ):
             candidates = candidate_types(system.name)
             if candidates:
                 info = lookup_system(system.name)
