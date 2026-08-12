@@ -228,3 +228,16 @@ detection. Both endpoints live-verified before implementation. 116 tests.
 - **Textual Tree ergonomics** at 30+ system chains — validate early in M2; fall back to a
   custom renderable if `Tree` fights the glyph-dense labels.
 - Final name/brand: TBD before M5 (repo, binary, config dir all currently `vagari`).
+
+## Backlog
+
+- **`home <name|off>` — designate any system as home.** Today `home` retraces to the
+  fragment root; there is no user-set home. Design (scoped 2026-08-12): an `is_home`
+  marker on `System` (travels through rekey/sever/adoption like `adrift_since`; one
+  additive dict field, legacy snapshots load untouched); `home <name>` resolves via
+  `_find_system`, `home off` clears, bare `home` routes as today with the root as
+  fallback; `homeward()` grows an up-to-common-ancestor-then-down walk (up legs name
+  doors by `return_prefix`, down legs by near-side `sig_prefix`); `⌂` glyph in the
+  tree. Edge cases: home in another fragment → "home is adrift"; home struck → flag
+  dies with the node, fall back to root. Undo/redo free (flag lives in the snapshot).
+  ~100–140 lines + half a dozen session tests.
