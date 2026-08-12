@@ -96,6 +96,7 @@ class DetailPanel(VerticalScroll):
         # the body (sections): it belongs to the entity, not to whatever
         # section happens to end the body.
         yield Static("", id="dossier-head")
+        yield Static("", id="dossier-form-label")
         yield Input(id="dossier-form")
         yield Digits("", id="dossier-eol")
         yield Static(EMPTY_STATE, id="dossier-body")
@@ -138,15 +139,23 @@ class DetailPanel(VerticalScroll):
         self.query_one("#dossier-trend").display = trend
         self.query_one("#dossier-sigs").display = table
         self.query_one("#dossier-form").display = form
+        self.query_one("#dossier-form-label").display = form
         self.query_one("#dossier-sigs-header").display = sigs_header
         if not form:
             self._form_wrap = None
 
-    def _arm_form(self, before: str, after: str, placeholder: str) -> None:
+    def _arm_form(
+        self, before: str, after: str, placeholder: str, label: str = ""
+    ) -> None:
         """Point the dossier's submission field at a filing: what the user
         types is wrapped as `{before} {typed}{after}` and run through the
-        same front door as the command line."""
+        same front door as the command line. The label says what filing
+        this is; the placeholder only gives examples."""
         self._form_wrap = (before, after)
+        self.query_one("#dossier-form-label", Static).update(
+            f"[{DIM}]▸[/{DIM}] [bold {MUTED}]{label}[/bold {MUTED}]"
+            if label else ""
+        )
         self.query_one("#dossier-form", Input).placeholder = placeholder
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -419,7 +428,9 @@ class DetailPanel(VerticalScroll):
             self.query_one("#dossier-trend", Sparkline).data = history
         if current:
             self._arm_form(
-                "here", "", f"here — name or correct {system.name}"
+                "here", "",
+                "a J-code or k-space name — files as `here <name>`",
+                label="NAME OR CORRECT THIS SYSTEM",
             )
         self._extras(
             False, len(history) >= 2, bool(system.sigs),
@@ -449,12 +460,15 @@ class DetailPanel(VerticalScroll):
             else ""
         )
         if sig.group is SigGroup.WORMHOLE and conn is not None and conn.wh_type:
-            hint = f"{sig.prefix} — label · or a corrected type code"
+            form_label = f"FILE AGAINST {sig.prefix}"
+            hint = "a label · or a corrected type code"
         elif sig.group is SigGroup.WORMHOLE:
-            hint = f"{sig.prefix} — type (K162 · H296) · destination (J105443) · label"
+            form_label = f"FILE AGAINST {sig.prefix}"
+            hint = "type (K162 · H296) · destination (J105443) · or a label"
         else:
-            hint = f"{sig.prefix} — label this signature, filed verbatim"
-        self._arm_form(sig.prefix.lower(), qualifier, hint)
+            form_label = f"LABEL {sig.prefix}"
+            hint = "free text, filed verbatim"
+        self._arm_form(sig.prefix.lower(), qualifier, hint, label=form_label)
         self._extras(show_eol, False, False, form=True)
 
         link = _link
@@ -522,8 +536,9 @@ class DetailPanel(VerticalScroll):
                 # return's true type is filed with `return <sig> <code>`.
                 self._arm_form(
                     sig.prefix.lower(), qualifier,
-                    f"{sig.prefix} — label only; type it via "
+                    f"free text — its type files via "
                     f"`return {sig.prefix.lower()} B274`",
+                    label=f"LABEL {sig.prefix}",
                 )
         verdict = classify_site(sig.group, sig.name)
         if verdict is not None:

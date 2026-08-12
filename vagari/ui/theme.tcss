@@ -250,12 +250,16 @@ Toast .toast--title {
 #dossier-trend > .sparkline--min-color {
     color: #3a3530;
 }
+#dossier-form-label {
+    height: auto;
+    margin: 1 1 0 1;
+}
 #dossier-form {
     height: 1;
     background: $warm-panel;
     border: none;
     color: $warm-text;
-    margin: 1 1 0 1;
+    margin: 0 1 0 1;
     padding: 0 1;
 }
 #dossier-form:focus {

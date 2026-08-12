@@ -264,7 +264,10 @@ async def test_system_dossier_actions_and_here_form(tmp_path):
         assert "@click=app.run_cmd('recon')" in text
         assert "@click=app.run_cmd('intel')" in text
         form = panel.query_one("#dossier-form", Input)
-        assert form.display and form.placeholder.startswith("here")
+        assert form.display and "here <name>" in form.placeholder
+        from textual.widgets import Static
+        label = str(panel.query_one("#dossier-form-label", Static).content)
+        assert "NAME OR CORRECT THIS SYSTEM" in label
 
         # A non-current system offers nav instead, and no naming form.
         app.session.execute("qlm J154535")
