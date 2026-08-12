@@ -457,9 +457,9 @@ class DetailPanel(VerticalScroll):
                 f"{hours}:{minutes:02d}"
             )
             eol_label = (
-                "END OF LIFE — COLLAPSE DUE WITHIN"
+                "END OF LIFE — COLLAPSE NO LATER THAN"
                 if conn is not None and conn.eol
-                else "COLLAPSE DUE WITHIN (upper bound)"
+                else "COLLAPSE DUE NO LATER THAN"
             )
             self.query_one("#dossier-eol-label", Static).update(
                 f"[{DIM}]▸[/{DIM}] [bold {MUTED}]{eol_label}[/bold {MUTED}]"
@@ -653,7 +653,7 @@ class DetailPanel(VerticalScroll):
                         lines.append(
                             f"  [{color}]LIFE {gauge(fraction)} "
                             f"≤{hours_text(life.remaining_hours)} remaining "
-                            f"(upper bound)[/{color}]"
+                            f"— the Bureau assumes the worst[/{color}]"
                         )
             else:
                 lines.append(
