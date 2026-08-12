@@ -367,7 +367,8 @@ async def test_kspace_rendering(tmp_path):
         assert "security 0.9" in text and "The Forge" in text
         assert "1,538,343" in text and "177.4T" in text
         assert "LAST KILL" in text and "Capsule" in text and "12.4M" in text
-        assert "Vile Rat (GoonWaffe · Goonswarm Federation) · Loki" in text
+        assert "└ Vile Rat · Loki" in text
+        assert "GoonWaffe · Goonswarm Federation" in text
 
 
 @pytest.mark.asyncio

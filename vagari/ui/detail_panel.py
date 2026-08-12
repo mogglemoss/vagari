@@ -256,27 +256,30 @@ class DetailPanel(VerticalScroll):
                 (utcnow() - lk.time).total_seconds() < 3600
             ) else MUTED
             lines.append(
-                f"  [{color}]LAST KILL: {when} — {lk.ship_name} down, "
+                f"  [{color}]LAST KILL: {when} — {lk.ship_name} down · "
                 f"{lk.attackers} attacker{'s' if lk.attackers != 1 else ''}"
                 f" · {human_isk(lk.isk)} ISK[/{color}]"
             )
             # Structure and NPC kills carry no pilot: lead with whatever
-            # identity the killmail does hold.
+            # identity the killmail does hold. Who-and-hull on one line;
+            # the org names, often the longest part, on their own.
             by = lk.killer or lk.killer_corp
-            org = " · ".join(
-                b for b in (lk.killer_corp, lk.killer_alliance)
-                if b and b != by
-            )
-            if by and org:
-                by += f" ({org})"
             if by and lk.killer_ship:
                 by += f" · {lk.killer_ship}"
-            elif not by and lk.killer_ship:
+            elif not by:
                 by = lk.killer_ship
+            org = " · ".join(
+                b for b in (lk.killer_corp, lk.killer_alliance)
+                if b and b != (lk.killer or lk.killer_corp)
+            )
+            esc = "\\["
             if by:
                 lines.append(
-                    f"    [{color}]└ {by.replace('[', chr(92) + '[')}"
-                    f"[/{color}]"
+                    f"    [{color}]└ {by.replace('[', esc)}[/{color}]"
+                )
+            if org:
+                lines.append(
+                    f"      [{MUTED}]{org.replace('[', esc)}[/{MUTED}]"
                 )
         else:
             lines.append(
@@ -477,16 +480,23 @@ class DetailPanel(VerticalScroll):
             action_row,
             f"[{TEXT}]{sig.group.value}[/{TEXT}] [{MUTED}]· signal {sig.signal:.1f}%[/{MUTED}]",
         ]
-        if sig.name:
+        if sig.name and sig.name != "Unstable Wormhole":
+            # Every unopened hole is named "Unstable Wormhole" — the group
+            # line already says so; only a distinctive name earns a line.
             self._head.append(f"[{TEXT}]{sig.name}[/{TEXT}]")
         if sig.label:
             self._head.append(f"[{WARN}]“{sig.label}”[/{WARN}]")
         if sig.flagged:
             self._head.append(f"[bold {WARN}]FLAGGED FOR ATTENTION[/bold {WARN}]")
-        self._head.append(
-            f"[{MUTED}]first noted {age_text(sig.first_seen)} ago · "
-            f"last confirmed {age_text(sig.last_seen)} ago[/{MUTED}]"
-        )
+        noted = age_text(sig.first_seen)
+        confirmed = age_text(sig.last_seen)
+        if noted == confirmed:
+            self._head.append(f"[{MUTED}]noted {noted} ago[/{MUTED}]")
+        else:
+            self._head.append(
+                f"[{MUTED}]noted {noted} ago · "
+                f"confirmed {confirmed} ago[/{MUTED}]"
+            )
         lines = []
         # The far side of the hole we came through: one wormhole, two sigs.
         is_return = False
