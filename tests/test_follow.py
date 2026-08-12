@@ -546,3 +546,36 @@ def test_first_scan_at_fragment_root_pairs_nothing(tmp_path):
     s.chain.root.name = "J105443"
     msg = s.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
     assert "return" not in msg  # a root has no inbound hole
+
+
+def test_return_repair_and_unpair(tmp_path):
+    """A wrong pairing is one command from fixed: `return <sig>` re-pairs,
+    `return!` strikes the pairing entirely."""
+    s = _arrived_session(tmp_path)
+    s.ingest(
+        "INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU\n"
+        "QQQ-001\tCosmic Signature\tWormhole\t\t8.0%\t1 AU"
+    )
+    inbound = s.chain.root.find_connection("XPA")
+    assert inbound.return_prefix is None  # two holes: nothing assumed
+
+    s.execute("return ina")
+    assert inbound.return_prefix == "INA"
+    s.execute("return qqq")               # re-pair: the correction IS the fix
+    assert inbound.return_prefix == "QQQ"
+
+    msg = s.execute("return!")
+    assert "Pairing struck" in msg and "QQQ" in msg
+    assert inbound.return_prefix is None
+    # The freed sig is an onward candidate again.
+    assert set(s.arrival_candidates() or []) == set()
+    s.execute("top")
+    assert s.execute("return!").startswith("REFUSED")  # roots have no inbound
+
+    # And by @system from anywhere.
+    s.execute("return ina @J154535")
+    assert inbound.return_prefix == "INA"
+    s.execute("top")
+    msg = s.execute("return! @J154535")
+    assert "Pairing struck" in msg
+    assert inbound.return_prefix is None

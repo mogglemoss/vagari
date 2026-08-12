@@ -210,6 +210,8 @@ class Session:
             return self._set_return(
                 rest[0], at, rest[1] if len(rest) > 1 else None
             )
+        if head == "return!":
+            return self._unpair_return(at)
         if head == "chain" and rest:
             return self._switch_chain(rest[0])
         if head == "pilot":
@@ -361,6 +363,31 @@ class Session:
             and system.find_connection(s.prefix) is None
             and s.prefix != paired
         ]
+
+    def _unpair_return(self, at: str | None = None) -> str:
+        """Strike a return pairing that was wrong — the current system's
+        (or @system's) inbound hole goes back to claiming no sig as home."""
+        if at is not None:
+            path = self._find_system(at)
+            if path is None:
+                raise ChainError(f"no system '{at}' on this chain")
+        else:
+            path = list(self.chain.location)
+        system = self.chain.system_at(path)
+        if len(path) <= 1:
+            raise ChainError(
+                f"{system.name} is a fragment root — no inbound hole to unpair"
+            )
+        inbound = self.chain.system_at(path[:-1]).find_connection(path[-1])
+        if inbound is None or inbound.return_prefix is None:
+            return f"No return pairing on record for {system.name}."
+        struck = inbound.return_prefix
+        inbound.return_prefix = None
+        self._commit()
+        return (
+            f"Pairing struck: {struck} no longer claims to be "
+            f"{system.name}'s way home. `return <sig>` when you know it."
+        )
 
     def _set_return(self, prefix: str, at: str | None = None,
                     code: str | None = None) -> str:

@@ -460,3 +460,37 @@ async def test_arrival_choice_in_dossier(tmp_path):
         conn = app.session.chain.root.find_connection("XPA")
         assert conn is not None and conn.child.name == "J154535"
         assert "ARRIVAL UNFILED" not in str(panel.content)
+
+
+@pytest.mark.asyncio
+async def test_pairing_correctable_from_both_dossiers(tmp_path):
+    """The pairing shows on both ends of the hole with an unpair link;
+    the return link on any other sig re-pairs from the dossier."""
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        s = app.session
+        s.ingest("XPA-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
+        s.follow("J154535")  # auto-files through XPA
+        s.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
+        assert s.chain.root.find_connection("XPA").return_prefix == "INA"
+        app.refresh_all()
+        panel = app.query_one(DetailPanel)
+
+        # Far side: the paired sig's dossier offers unpair.
+        panel.show_node(("sig", [0, "XPA"], "INA"))
+        text = str(panel.content)
+        assert "RETURN" in text
+        assert "run_cmd('return! @J154535')" in text
+
+        # Near side: THE PASSAGE shows the pairing and offers unpair.
+        panel.show_node(("sig", [0], "XPA"))
+        text = str(panel.content)
+        assert "paired return" in text and "INA" in text
+        assert "run_cmd('return! @J154535')" in text
+
+        # Clicking unpair strikes it.
+        app.action_run_cmd("return! @J154535")
+        await pilot.pause()
+        assert s.chain.root.find_connection("XPA").return_prefix is None
+        assert "paired return" not in str(panel.content)

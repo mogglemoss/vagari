@@ -446,6 +446,13 @@ class DetailPanel(VerticalScroll):
                     f"of {pair}{via.sig_prefix} in {parent.name}. One hole, "
                     f"two signatures; its clock and mass are shared.[/{MUTED}]"
                 )
+                if system.name and not system.name.startswith("?"):
+                    unpair_cmd = f"run_cmd('return! @{system.name}')"
+                    lines.append(
+                        f"  {_link('unpair', unpair_cmd)} "
+                        f"[{DIM}]— if this is not the way home; `return "
+                        f"<sig>` names the true one[/{DIM}]"
+                    )
         if sig.name:
             lines.append(f"[{TEXT}]{sig.name}[/{TEXT}]")
         if sig.label:
@@ -501,6 +508,18 @@ class DetailPanel(VerticalScroll):
             lines += ["", _rule("THE PASSAGE")]
             lines.append(f"  [{MUTED}]leads to[/{MUTED}] "
                          f"[{TEXT}]{conn.child.name}[/{TEXT}]")
+            if conn.return_prefix:
+                unpair = ""
+                if conn.child.name and not conn.child.name.startswith("?"):
+                    unpair_cmd = f"run_cmd('return! @{conn.child.name}')"
+                    unpair = (
+                        f" [{DIM}]·[/{DIM}] " + _link("unpair", unpair_cmd)
+                    )
+                lines.append(
+                    f"  [{MUTED}]paired return[/{MUTED}] "
+                    f"[{TEXT}]{conn.return_prefix}[/{TEXT}] "
+                    f"[{MUTED}]on the far side[/{MUTED}]{unpair}"
+                )
             wh_type = lookup_wh_type(conn.wh_type) if conn.wh_type else None
             if wh_type is not None:
                 # K162s carry no book data — target, mass, and lifetime are

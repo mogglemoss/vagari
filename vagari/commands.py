@@ -56,7 +56,8 @@ REGISTRY: list[Command] = [
             "record"),
     Command("", "abc <words>", "label a signature", "record"),
     Command("return", "return abc [B274]", "abc is the way home; optional "
-            "type read from this side", "record"),
+            "type read from this side (re-pair to correct; return! unpairs)",
+            "record", aliases=("return!",)),
     Command("here", "here <name>", "name the current system", "record"),
     Command("flag", "flag abc", "flag a signature for attention", "record",
             keys="x"),
