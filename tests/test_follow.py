@@ -489,3 +489,60 @@ def test_k_abc_short_form(tmp_path):
     msg = s.execute("k una")
     assert "through UNA" in msg
     assert s.chain.location == [0, "UNA"]
+
+
+# -- first-scan return pairing ----------------------------------------------
+
+def _arrived_session(tmp_path):
+    """Standing in a fresh J154535, entered through XPA, nothing scanned."""
+    s = _session_with_holes(tmp_path, holes=1)
+    s.follow("J154535")            # auto-files through XPA, moves inside
+    assert s.chain.location == [0, "XPA"]
+    assert not s.chain.current().sigs
+    return s
+
+
+def test_first_scan_lone_hole_pairs_return(tmp_path):
+    s = _arrived_session(tmp_path)
+    msg = s.ingest(
+        "INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU\n"
+        "FIY-570\tCosmic Signature\tRelic Site\tRuined Ruins\t50.0%\t1 AU"
+    )
+    assert "INA filed as your return through XPA" in msg
+    inbound = s.chain.root.find_connection("XPA")
+    assert inbound.return_prefix == "INA"
+    assert inbound.wh_type is None      # the type is never assumed
+    assert inbound.k162_end is None
+    # The paired return is not an onward candidate: a later lone hole
+    # still auto-files an arrival.
+    s.ingest("QQQ-001\tCosmic Signature\tWormhole\t\t8.0%\t1 AU")
+    msg = s.follow("J100744")
+    assert "through QQQ" in msg
+
+
+def test_first_scan_two_holes_pairs_nothing(tmp_path):
+    s = _arrived_session(tmp_path)
+    msg = s.ingest(
+        "INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU\n"
+        "QQQ-001\tCosmic Signature\tWormhole\t\t8.0%\t1 AU"
+    )
+    assert "return" not in msg
+    assert s.chain.root.find_connection("XPA").return_prefix is None
+
+
+def test_later_scans_never_pair(tmp_path):
+    s = _arrived_session(tmp_path)
+    s.ingest("FIY-570\tCosmic Signature\tRelic Site\t\t50.0%\t1 AU")
+    msg = s.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
+    assert "filed as your return" not in msg
+    assert s.chain.root.find_connection("XPA").return_prefix is None
+
+
+def test_first_scan_at_fragment_root_pairs_nothing(tmp_path):
+    from vagari.model.store import Store
+    from vagari.session import Session
+
+    s = Session.open(Store(base_dir=tmp_path / "state"))
+    s.chain.root.name = "J105443"
+    msg = s.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
+    assert "return" not in msg  # a root has no inbound hole

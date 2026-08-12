@@ -117,12 +117,19 @@ class Session:
         lines = parse_scan(text)
         if not lines:
             return "Nothing legible in that deposit. The Bureau is merely noting."
+        current = self.chain.current()
+        first_scan = not current.sigs
         # Every deposit reports despawn candidates; `sweep` is the only
         # destructive step, so reporting costs nothing and forgets nothing.
-        report = reconcile(self.chain.current(), lines, lazy=True)
+        report = reconcile(current, lines, lazy=True)
         self.last_report = report
+        return_note = ""
+        if first_scan:
+            return_note = self._pair_return_from_first_scan(current)
         self._commit()
         parts = []
+        if return_note:
+            parts.append(return_note)
         if report.new:
             parts.append(f"NEW: {' '.join(report.new)}")
         if report.updated:
@@ -312,6 +319,48 @@ class Session:
         conn.mass = cycle[(cycle.index(conn.mass) + 1) % 3]
         self._commit()
         return f"{conn.sig_prefix} ({system.name}) mass: {conn.mass.value.upper()}."
+
+    def _pair_return_from_first_scan(self, system) -> str:
+        """The first deposit in a fresh system: a lone wormhole among the
+        new sigs is almost always the way home — it is the first thing a
+        pilot scans. Pairs the sig only; the type is never assumed, and
+        `return <sig>` restates the pairing if the guess was wrong."""
+        path = self.chain.location
+        if len(path) <= 1:
+            return ""
+        parent = self.chain.system_at(path[:-1])
+        inbound = parent.find_connection(path[-1])
+        if inbound is None or inbound.return_prefix is not None:
+            return ""
+        holes = [
+            s for s in system.sigs
+            if s.group is SigGroup.WORMHOLE
+            and system.find_connection(s.prefix) is None
+        ]
+        if len(holes) != 1:
+            return ""
+        inbound.return_prefix = holes[0].prefix
+        return (
+            f"{holes[0].prefix} filed as your return through "
+            f"{inbound.sig_prefix} — sole hole in a first scan "
+            f"(`return <sig>` to correct)"
+        )
+
+    def _unopened_holes(self, system, path) -> list[str]:
+        """Scanned, unopened wormhole sigs that could lead somewhere new —
+        the paired return hole leads home and is not a candidate."""
+        paired = None
+        if len(path) > 1:
+            parent = self.chain.system_at(path[:-1])
+            via = parent.find_connection(path[-1])
+            if via is not None:
+                paired = via.return_prefix
+        return [
+            s.prefix for s in system.sigs
+            if s.group is SigGroup.WORMHOLE
+            and system.find_connection(s.prefix) is None
+            and s.prefix != paired
+        ]
 
     def _set_return(self, prefix: str, at: str | None = None,
                     code: str | None = None) -> str:
@@ -683,11 +732,7 @@ class Session:
         # destinations, plus scanned-but-unopened wormhole sigs. Exactly one
         # candidate → the record files itself; more → the pilot arbitrates.
         unknown = [c for c in current.connections if c.child.name == "?"]
-        unopened = [
-            s.prefix for s in current.sigs
-            if s.group is SigGroup.WORMHOLE
-            and current.find_connection(s.prefix) is None
-        ]
+        unopened = self._unopened_holes(current, chain.location)
         # When the arrival is an adrift fragment's ROOT, reattach the
         # fragment whole — this outranks merely relocating the marker.
         if len(unknown) == 1 and not unopened:
@@ -761,13 +806,12 @@ class Session:
         unopened wormhole sigs."""
         if self.pending_arrival is None:
             return []
-        origin = self.chain.system_at(self.pending_arrival[1])
+        from_path = self.pending_arrival[1]
+        origin = self.chain.system_at(from_path)
         out = [c.sig_prefix for c in origin.connections if c.child.name == "?"]
         out += [
-            s.prefix for s in origin.sigs
-            if s.group is SigGroup.WORMHOLE
-            and origin.find_connection(s.prefix) is None
-            and s.prefix not in out
+            p for p in self._unopened_holes(origin, from_path)
+            if p not in out
         ]
         return out
 
