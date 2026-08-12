@@ -98,6 +98,7 @@ class DetailPanel(VerticalScroll):
         yield Static("", id="dossier-head")
         yield Static("", id="dossier-form-label")
         yield Input(id="dossier-form")
+        yield Static("", id="dossier-eol-label")
         yield Digits("", id="dossier-eol")
         yield Static(EMPTY_STATE, id="dossier-body")
         yield Sparkline([], id="dossier-trend")
@@ -136,6 +137,7 @@ class DetailPanel(VerticalScroll):
         form: bool = False, sigs_header: bool = False,
     ) -> None:
         self.query_one("#dossier-eol").display = eol
+        self.query_one("#dossier-eol-label").display = eol
         self.query_one("#dossier-trend").display = trend
         self.query_one("#dossier-sigs").display = table
         self.query_one("#dossier-form").display = form
@@ -453,6 +455,14 @@ class DetailPanel(VerticalScroll):
             minutes = int((life.remaining_hours - hours) * 60)
             self.query_one("#dossier-eol", Digits).update(
                 f"{hours}:{minutes:02d}"
+            )
+            eol_label = (
+                "END OF LIFE — COLLAPSE DUE WITHIN"
+                if conn is not None and conn.eol
+                else "COLLAPSE DUE WITHIN (upper bound)"
+            )
+            self.query_one("#dossier-eol-label", Static).update(
+                f"[{DIM}]▸[/{DIM}] [bold {MUTED}]{eol_label}[/bold {MUTED}]"
             )
         qualifier = (
             f" @{system.name}"

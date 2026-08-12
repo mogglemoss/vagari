@@ -235,6 +235,10 @@ Toast .toast--title {
     height: auto;
     margin: 1 0 0 0;
 }
+#dossier-eol-label {
+    height: auto;
+    margin: 1 1 0 1;
+}
 #dossier-eol {
     height: 3;
     color: #d4a017;
