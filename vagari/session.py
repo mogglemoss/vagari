@@ -210,8 +210,10 @@ class Session:
         if head == "here" and rest:
             return self._name_system(self.chain.current(), rest[0].upper()
                                      if _JCODE.match(rest[0]) else " ".join(rest))
-        if head == "k162":
-            return self.file_k162()
+        if head in ("k162", "k"):
+            return self.file_k162(rest[0] if rest else None)
+        if head in ("k162!", "k!"):
+            return self.file_k162("!")
         if head == "rekey" and len(rest) == 2:
             return self._rekey(rest[0], rest[1], at)
         if len(rest) == 2 and rest[0] == "=" and _PREFIX.match(head):
@@ -677,12 +679,18 @@ class Session:
                 self._commit(amend=True)
                 return f"Followed you back up to {name}."
 
-        # An opened hole with an unknown destination: if exactly one exists,
-        # assume that is the one you took. When the arrival is an adrift
-        # fragment's ROOT, reattach the fragment whole — this outranks merely
-        # relocating the marker into it.
+        # Passages that could be the one you took: opened holes with unknown
+        # destinations, plus scanned-but-unopened wormhole sigs. Exactly one
+        # candidate → the record files itself; more → the pilot arbitrates.
         unknown = [c for c in current.connections if c.child.name == "?"]
-        if len(unknown) == 1:
+        unopened = [
+            s.prefix for s in current.sigs
+            if s.group is SigGroup.WORMHOLE
+            and current.find_connection(s.prefix) is None
+        ]
+        # When the arrival is an adrift fragment's ROOT, reattach the
+        # fragment whole — this outranks merely relocating the marker.
+        if len(unknown) == 1 and not unopened:
             conn = unknown[0]
             for ri, root in enumerate(chain.roots):
                 if root.name.lower() == name.lower() and ri != chain.location[0]:
@@ -706,7 +714,7 @@ class Session:
             self._commit(amend=True)
             return f"Relocated ◉ YOU to {name} (elsewhere in the chain)."
 
-        if len(unknown) == 1:
+        if len(unknown) == 1 and not unopened:
             conn = unknown[0]
             expected = conn.child.jclass
             self._name_system(conn.child, name)
@@ -726,18 +734,100 @@ class Session:
                 f"record as {name}.{note}"
             )
 
+        if not unknown and len(unopened) == 1:
+            # One scanned hole, one unaccounted arrival: file it through —
+            # no placeholder, no rekey, no keypress.
+            self.pending_arrival = (name, list(chain.location))
+            return self.file_k162(unopened[0])
+
         self.pending_arrival = (name, list(chain.location))
+        if unknown or unopened:
+            listing = " · ".join(
+                [c.sig_prefix for c in unknown] + unopened
+            )
+            return (
+                f"Arrived in UNMAPPED {name} — which passage out of "
+                f"{current.name}? {listing}. Submit `k162 <sig>` or click "
+                f"one in the dossier; `k162!` files a fresh hole."
+            )
         return (
             f"Arrived in UNMAPPED {name}. Press k (or submit `k162`) to file it "
             f"as a K162 out of {current.name}."
         )
 
-    def file_k162(self) -> str:
-        """File a pending unmapped arrival as a K162 child of where we came from."""
+    def arrival_candidates(self) -> list[str]:
+        """Sig prefixes in the pending origin that could be the hole just
+        taken: typed holes with unknown destinations, then scanned-but-
+        unopened wormhole sigs."""
+        if self.pending_arrival is None:
+            return []
+        origin = self.chain.system_at(self.pending_arrival[1])
+        out = [c.sig_prefix for c in origin.connections if c.child.name == "?"]
+        out += [
+            s.prefix for s in origin.sigs
+            if s.group is SigGroup.WORMHOLE
+            and origin.find_connection(s.prefix) is None
+            and s.prefix not in out
+        ]
+        return out
+
+    def file_k162(self, via: str | None = None) -> str:
+        """File a pending unmapped arrival — through the hole you actually
+        took when the record can tell which one that was.
+
+        `via` names the passage explicitly; None auto-selects when exactly
+        one candidate exists; "!" insists on a fresh unscanned hole."""
         if self.pending_arrival is None:
             return "No unmapped arrival pending. The record is at peace."
         name, from_path = self.pending_arrival
         origin = self.chain.system_at(from_path)
+        fresh = via == "!"
+        candidates = self.arrival_candidates()
+        if via and not fresh:
+            picks = [c for c in candidates if c.upper() == via.upper()]
+            if not picks:
+                raise ChainError(
+                    f"no unopened passage '{via.upper()}' out of {origin.name}"
+                )
+            via = picks[0]
+        elif not fresh and len(candidates) == 1:
+            via = candidates[0]
+        elif not fresh and len(candidates) > 1:
+            listing = " · ".join(candidates)
+            return (
+                f"UNFILED: {name} — which passage out of {origin.name}? "
+                f"{listing}. Submit `k162 <sig>` (or click one in the "
+                f"dossier); `k162!` files a fresh unscanned hole."
+            )
+        else:
+            via = None
+        if via is not None:
+            conn = origin.find_connection(via)
+            if conn is not None:
+                # A typed hole whose far side was never confirmed.
+                self._name_system(conn.child, name)
+                self.chain.location = list(from_path) + [via]
+                self.pending_arrival = None
+                self._commit()
+            else:
+                info = lookup_system(name)
+                saved = self.chain.location
+                self.chain.location = list(from_path)
+                try:
+                    self.chain.open_connection(
+                        via, info.jcode if info else name,
+                        jclass=info.jclass if info else None,
+                        statics=info.static_display if info else None,
+                        effect=info.effect if info else None,
+                        wh_type=None,
+                    )
+                except ChainError:
+                    self.chain.location = saved
+                    raise
+                self.chain.location = list(from_path) + [via]
+                self.pending_arrival = None
+                self._commit()
+            return f"Filed {name} through {via}. The record aligns."
         prefix = self._placeholder_prefix(origin)
         origin.sigs.append(
             Signature(sig_id=f"{prefix}-000", group=SigGroup.WORMHOLE,

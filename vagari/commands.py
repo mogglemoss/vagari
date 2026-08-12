@@ -82,8 +82,10 @@ REGISTRY: list[Command] = [
             "adrift fragment, kept not lost", "forest"),
     Command("fragment", "fragment [name]", "file a disconnected fragment "
             "(or a pending arrival)", "forest"),
-    Command("k162", "k162", "file a pending unmapped arrival", "forest",
-            keys="k", palette="File K162", action="file_k162"),
+    Command("k162", "k162 [abc] · k abc", "file a pending arrival through "
+            "the hole you took (auto when only one fits; k162! forces a "
+            "fresh hole)", "forest", keys="k", palette="File K162",
+            action="file_k162", aliases=("k", "k162!", "k!")),
     # views & custody
     Command("", "1–5", "all · paths · sites · gas · combat (structural "
             "wormholes stay)", "views"),

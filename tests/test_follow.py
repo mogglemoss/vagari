@@ -84,7 +84,7 @@ def test_rekey_merges_duplicate_sibling(tmp_path):
     sess.ingest("HUV-843\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t1 AU")
     sess.execute("huv U210")            # HUV → "?"
     sess.pending_arrival = ("J141150", [0])
-    sess.file_k162()                    # the old bug: ZAA → J141150 sibling
+    sess.file_k162("!")                 # forced fresh hole: the old duplicate
     sess.chain.current().sigs.append(Signature(sig_id="INA-123"))
     assert len(sess.chain.root.connections) == 2
 
@@ -415,3 +415,77 @@ def test_cold_start_shows_not_following_hint(tmp_path):
 
     header = asyncio.run(run())
     assert "NOT FOLLOWING" in header and "pilot" in header
+
+
+# -- filing an arrival through the hole actually taken -----------------------
+
+def _session_with_holes(tmp_path, holes=1):
+    from vagari.model.store import Store
+    from vagari.session import Session
+
+    s = Session.open(Store(base_dir=tmp_path / "state"))
+    s.chain.root.name = "J105443"
+    s.ingest("XPA-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
+    for i in range(holes - 1):
+        s.ingest(f"UN{chr(65 + i)}-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
+    return s
+
+
+def test_arrival_files_itself_through_sole_scanned_hole(tmp_path):
+    """One scanned hole, one unaccounted arrival: the record files itself
+    at jump time — no k, no placeholder, no rekey."""
+    s = _session_with_holes(tmp_path, holes=1)
+    msg = s.follow("J154535")
+    assert "through XPA" in msg
+    assert s.pending_arrival is None
+    assert s.chain.location == [0, "XPA"]
+    conn = s.chain.root.find_connection("XPA")
+    assert conn is not None and conn.child.name == "J154535"
+    assert s.chain.root.find_sig("ZAA") is None
+
+
+def test_k_ambiguous_asks_then_files_by_name(tmp_path):
+    s = _session_with_holes(tmp_path, holes=2)
+    msg = s.follow("J154535")
+    assert "which passage" in msg and s.pending_arrival is not None
+    msg = s.file_k162()
+    assert "which passage" in msg
+    assert s.pending_arrival is not None  # nothing mutated
+    msg = s.file_k162("xpa")  # case-insensitive pick
+    assert "through XPA" in msg
+    assert s.chain.location == [0, "XPA"]
+
+
+def test_k_bang_forces_fresh_hole(tmp_path):
+    s = _session_with_holes(tmp_path, holes=2)
+    s.follow("J154535")
+    msg = s.execute("k162!")
+    assert "placeholder ZAA" in msg
+    assert s.chain.root.find_sig("ZAA") is not None
+    assert s.chain.location == [0, "ZAA"]
+
+
+def test_k_via_typed_hole_with_unknown_destination(tmp_path):
+    from vagari.model.store import Store
+    from vagari.session import Session
+
+    s = Session.open(Store(base_dir=tmp_path / "state"))
+    s.chain.root.name = "J105443"
+    s.ingest("XPA-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
+    s.ingest("UNB-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
+    s.execute("xpa H296")  # typed: connection with unknown far side
+    msg = s.follow("J154535")  # UNB also fits: the pilot must arbitrate
+    assert "which passage" in msg and s.pending_arrival is not None
+    assert set(s.arrival_candidates()) == {"XPA", "UNB"}
+    s.file_k162("XPA")
+    conn = s.chain.root.find_connection("XPA")
+    assert conn.child.name == "J154535" and conn.wh_type == "H296"
+    assert s.chain.location == [0, "XPA"]
+
+
+def test_k_abc_short_form(tmp_path):
+    s = _session_with_holes(tmp_path, holes=2)
+    s.follow("J154535")
+    msg = s.execute("k una")
+    assert "through UNA" in msg
+    assert s.chain.location == [0, "UNA"]
