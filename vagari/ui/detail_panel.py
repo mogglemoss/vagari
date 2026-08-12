@@ -429,8 +429,8 @@ class DetailPanel(VerticalScroll):
         if current:
             self._arm_form(
                 "here", "",
-                "a J-code or k-space name — files as `here <name>`",
-                label="NAME OR CORRECT THIS SYSTEM",
+                "type a name (J103529 · Amarr) — Enter renames this system",
+                label="RENAME THIS SYSTEM",
             )
         self._extras(
             False, len(history) >= 2, bool(system.sigs),
@@ -461,13 +461,13 @@ class DetailPanel(VerticalScroll):
         )
         if sig.group is SigGroup.WORMHOLE and conn is not None and conn.wh_type:
             form_label = f"FILE AGAINST {sig.prefix}"
-            hint = "a label · or a corrected type code"
+            hint = "words label it · a new code retypes it"
         elif sig.group is SigGroup.WORMHOLE:
             form_label = f"FILE AGAINST {sig.prefix}"
-            hint = "type (K162 · H296) · destination (J105443) · or a label"
+            hint = "H296 types it · J105443 opens it · words label it"
         else:
-            form_label = f"LABEL {sig.prefix}"
-            hint = "free text, filed verbatim"
+            form_label = f"FILE AGAINST {sig.prefix}"
+            hint = "words label it — filed verbatim"
         self._arm_form(sig.prefix.lower(), qualifier, hint, label=form_label)
         self._extras(show_eol, False, False, form=True)
 
@@ -536,9 +536,9 @@ class DetailPanel(VerticalScroll):
                 # return's true type is filed with `return <sig> <code>`.
                 self._arm_form(
                     sig.prefix.lower(), qualifier,
-                    f"free text — its type files via "
+                    f"words label it · type it via "
                     f"`return {sig.prefix.lower()} B274`",
-                    label=f"LABEL {sig.prefix}",
+                    label=f"FILE AGAINST {sig.prefix}",
                 )
         verdict = classify_site(sig.group, sig.name)
         if verdict is not None:
