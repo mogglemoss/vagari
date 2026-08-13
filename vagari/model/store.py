@@ -153,6 +153,27 @@ class Store:
         else:
             f.unlink(missing_ok=True)
 
+    def load_trail(self) -> tuple[list, list] | None:
+        """The unfiled-jump trail: (names, anchor path) — survives restarts."""
+        import json
+
+        f = self.base_dir / "TRAIL"
+        try:
+            d = json.loads(f.read_text())
+            return list(d["names"]), list(d["from"])
+        except (OSError, ValueError, KeyError):
+            return None
+
+    def save_trail(self, names: list, from_path: list | None) -> None:
+        import json
+
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        f = self.base_dir / "TRAIL"
+        if names and from_path is not None:
+            f.write_text(json.dumps({"names": names, "from": from_path}))
+        else:
+            f.unlink(missing_ok=True)
+
     def load_active(self) -> str | None:
         try:
             return (self.base_dir / "ACTIVE").read_text().strip() or None

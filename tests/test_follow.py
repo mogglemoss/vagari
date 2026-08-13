@@ -661,3 +661,34 @@ def test_life_and_mass_grammar_file_readings(tmp_path):
     assert inbound.mass.value == "critical"
     s.execute("crit xpa fresh")
     assert inbound.mass.value == "fresh"
+
+
+def test_trail_survives_restart(tmp_path):
+    """Quit mid-trail, restart: the unfiled jumps are still queued."""
+    from vagari.model.store import Store
+    from vagari.session import Session
+
+    s = _session_with_holes(tmp_path, holes=2)
+    s.follow("J103529")
+    s.follow("J235117")
+    assert s.pending_display() == "J103529 → J235117"
+
+    s2 = Session.open(Store(base_dir=tmp_path / "state"))
+    assert s2.pending_display() == "J103529 → J235117"
+    msg = s2.file_k162("xpa")
+    assert "Filed 2 jumps" in msg
+    assert s2.pending_display() is None
+    # Filed and cleared: a third open sees an empty TRAIL file.
+    s3 = Session.open(Store(base_dir=tmp_path / "state"))
+    assert s3.pending_display() is None
+
+
+def test_mapped_arrival_reports_dropped_trail(tmp_path):
+    s = _session_with_holes(tmp_path, holes=2)   # two candidates: ambiguous
+    s.execute("fragment J154535")
+    s.jump([0])                  # back to the root fragment's origin
+    s.follow("J103529")
+    assert s.pending_display() == "J103529"
+    msg = s.follow("J154535")   # pops out somewhere already mapped
+    assert "Relocated" in msg and "dropped (J103529)" in msg
+    assert s.pending_display() is None

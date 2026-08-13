@@ -63,6 +63,9 @@ class Session:
             store.commit(chain)
         session = cls(store=store, chain=chain)
         session.pilot_lock = store.load_pilot()
+        trail = store.load_trail()
+        if trail is not None:
+            session._pending_trail, session._pending_from = trail
         return session
 
     def _set_pilot_lock(self, pilot: str | None) -> None:
@@ -90,6 +93,10 @@ class Session:
         else:
             self._pending_trail = [value[0]]
             self._pending_from = list(value[1])
+        self._save_trail()
+
+    def _save_trail(self) -> None:
+        self.store.save_trail(self._pending_trail, self._pending_from)
 
     def pending_display(self) -> str | None:
         """The unfiled trail for the header badge: 'A' or 'A → B'."""
@@ -1008,10 +1015,15 @@ class Session:
 
         found = self._find_system(name)
         if found is not None:
+            dropped = self.pending_display()
             chain.location = found
             self.pending_arrival = None
             self._commit(amend=True)
-            return f"Relocated ◉ YOU to {name} (elsewhere in the chain)."
+            note = (
+                f" Unfiled trail dropped ({dropped}) — the record could "
+                f"not place it." if dropped else ""
+            )
+            return f"Relocated ◉ YOU to {name} (elsewhere in the chain).{note}"
 
         if len(unknown) == 1 and not unopened:
             conn = unknown[0]
@@ -1040,12 +1052,14 @@ class Session:
                 return None  # the same unfiled system, re-announced
             if len(self._pending_trail) >= 2 and name == self._pending_trail[-2]:
                 self._pending_trail.pop()
+                self._save_trail()
                 depth = len(self._pending_trail)
                 return (
                     f"Backtracked to unfiled {name} — trail now "
                     f"{depth} jump{'s' if depth != 1 else ''} deep."
                 )
             self._pending_trail.append(name)
+            self._save_trail()
             depth = len(self._pending_trail)
             return (
                 f"Arrived in UNMAPPED {name} — {depth} unfiled jumps "
