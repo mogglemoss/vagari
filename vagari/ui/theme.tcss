@@ -71,8 +71,8 @@ FooterKey > .footer-key--description {
 
 #status-line {
     height: 1;
-    background: $warm-surface;
-    color: $warm-muted;
+    background: $warm-panel;
+    color: $warm-text;
     padding: 0 1;
 }
 

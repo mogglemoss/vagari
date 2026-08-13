@@ -550,12 +550,11 @@ class DetailPanel(VerticalScroll):
                         f"[{DIM}]— if this is not the way home; `return "
                         f"<sig>` names the true one[/{DIM}]"
                     )
-                # A code typed here would open the hole OUTBOUND — the
-                # return's true type is filed with `return <sig> <code>`.
+                # Codes here type the INBOUND hole from this side —
+                # the engine routes them through the return grammar.
                 self._arm_form(
                     sig.prefix.lower(), qualifier,
-                    f"words label it · type it via "
-                    f"`return {sig.prefix.lower()} B274`",
+                    "B274 or K162 types it from this side · words label it",
                     label=f"FILE AGAINST {sig.prefix}",
                 )
         verdict = classify_site(sig.group, sig.name)

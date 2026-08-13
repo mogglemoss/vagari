@@ -786,8 +786,15 @@ class Session:
 
     def _set_wh_type(self, prefix: str, code: str, at: str | None = None) -> str:
         wh_type = lookup_wh_type(code)
-        _, system, _sig = self._locate(prefix, at)
+        path, system, sig = self._locate(prefix, at)
         conn = system.find_connection(prefix)
+        # Typing the paired return types the INBOUND hole from this side —
+        # it must never open a second hole out of this system.
+        if conn is None and len(path) > 1:
+            parent = self.chain.system_at(path[:-1])
+            via = parent.find_connection(path[-1])
+            if via is not None and via.return_prefix == sig.prefix:
+                return self._set_return(sig.prefix, at, code)
         if code == "K162":
             # K162 is an end, not a type: this sig is the far side of a hole
             # someone opened INTO this system. Its true type is unknown until

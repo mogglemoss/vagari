@@ -263,7 +263,18 @@ class MapperApp(App):
         self.session.dirty = False
 
     def status(self, message: str) -> None:
-        self.query_one("#status-line", Static).update(message)
+        """The notification line — styled by weight, because a question or
+        an unfiled arrival buried in muted grey gets missed in the field."""
+        text = message.replace("[", "\\[")
+        urgent = message.startswith(("REFUSED:", "CONFIRM:")) or "UNMAPPED" in message
+        if urgent:
+            markup = f"[bold #e8a559]▸ {text}[/bold #e8a559]"
+        else:
+            markup = f"[#a09890]▸ {text}[/#a09890]"
+        self.query_one("#status-line", Static).update(markup)
+        # Questions and arrivals demand eyes — raise a toast as well.
+        if message.startswith("CONFIRM:") or "UNMAPPED" in message:
+            self.notify(message, severity="warning", timeout=6)
 
     def _after_engine(self, message: str) -> None:
         hint = self.session.orientation_hint()

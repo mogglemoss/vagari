@@ -618,3 +618,22 @@ def test_unfiled_trail_backtrack_pops(tmp_path):
     assert s.follow("J105443") is None or True  # back at the anchor
     s.follow("J105443")
     assert s.pending_arrival is None     # trail cleared at the anchor
+
+
+def test_typing_the_paired_return_types_the_inbound_hole(tmp_path):
+    """`ina K162` on a paired return must file the inbound hole's end —
+    never open a second hole out of the new system."""
+    s = _arrived_session(tmp_path)
+    s.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
+    inbound = s.chain.root.find_connection("XPA")
+    assert inbound.return_prefix == "INA"
+
+    msg = s.execute("ina K162")
+    assert "K162" in msg
+    assert inbound.k162_end == "child"        # this side wears the K162
+    assert s.chain.current().find_connection("INA") is None  # no new hole
+
+    msg = s.execute("ina B274")
+    assert inbound.wh_type == "B274"
+    assert inbound.k162_end == "parent"       # true type read on this side
+    assert s.chain.current().find_connection("INA") is None
