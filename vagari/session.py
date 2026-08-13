@@ -40,8 +40,12 @@ class Session:
     kspace: dict = field(default_factory=dict, init=False)
     # zKill per-system stats: system_id → SystemKillStats (session cache).
     zkill_stats: dict = field(default_factory=dict, init=False)
-    # Follow-me: an arrival the chain can't place — (system name, path we came from).
-    pending_arrival: tuple[str, list[str]] | None = field(default=None, init=False)
+    # Follow-me: unfiled arrivals — a TRAIL of system names jumped without
+    # filing, anchored at the path the first jump left from.
+    _pending_trail: list = field(default_factory=list, init=False)
+    _pending_from: list | None = field(default=None, init=False)
+    # A destructive act awaiting y/n: (question, the forced command).
+    pending_confirm: tuple | None = field(default=None, init=False)
     # Multibox follow-me: locked pilot (None = first to jump wins) and each
     # observed pilot's last known system.
     pilot_lock: str | None = field(default=None, init=False)
@@ -70,6 +74,28 @@ class Session:
         # undo step — a long roam should not flush the mapping history.
         (self.store.amend if amend else self.store.commit)(self.chain)
         self.dirty = True
+
+    @property
+    def pending_arrival(self) -> tuple | None:
+        """Compat view of the trail: (latest unfiled name, anchor path)."""
+        if not self._pending_trail:
+            return None
+        return (self._pending_trail[-1], list(self._pending_from))
+
+    @pending_arrival.setter
+    def pending_arrival(self, value) -> None:
+        if value is None:
+            self._pending_trail = []
+            self._pending_from = None
+        else:
+            self._pending_trail = [value[0]]
+            self._pending_from = list(value[1])
+
+    def pending_display(self) -> str | None:
+        """The unfiled trail for the header badge: 'A' or 'A → B'."""
+        if not self._pending_trail:
+            return None
+        return " → ".join(self._pending_trail)
 
     def orientation_hint(self) -> str | None:
         """The first-session ladder: three hints, each earned by doing the
@@ -153,6 +179,15 @@ class Session:
             return f"REFUSED: {err}"
 
     def _dispatch(self, head: str, rest: list[str], raw: str) -> str:
+        # A destructive act may be awaiting y/n; anything else cancels it.
+        if self.pending_confirm is not None:
+            _question, forced = self.pending_confirm
+            self.pending_confirm = None
+            if head in ("y", "yes"):
+                return self.execute(forced)
+            if head in ("n", "no"):
+                return "Struck nothing. The record stands."
+            # Any other filing withdraws the question and proceeds normally.
         # An @System token anywhere addresses a signature in that system;
         # without it, sigs resolve current-system-first, then chain-wide.
         at = None
@@ -170,7 +205,16 @@ class Session:
             self._commit(amend=True)
             return f"Relocated to {self.chain.current().name}."
         if head in ("home", "route"):
+            if rest:
+                return self._set_home(" ".join(rest))
             return self.homeward()
+        if head == "home!":
+            if self.chain.home is None:
+                return "No home on file — the fragment root already serves."
+            struck = self.chain.home
+            self.chain.home = None
+            self._commit()
+            return f"Home unfiled: {struck}. The fragment root serves again."
         if head == "up":
             self.chain.up()
             self._commit(amend=True)
@@ -486,6 +530,30 @@ class Session:
                 force: bool = False, sig_only: bool = False) -> str:
         """One strike verb: each argument is a signature prefix, a fragment
         #number, or a fragment name — resolved in that order."""
+        # Pre-scan: if any target hides mapped content, ask BEFORE touching
+        # anything — a half-struck filing is worse than a question.
+        if not force:
+            for arg in args:
+                if not sig_only and arg.lstrip("#").isdigit():
+                    continue  # fragments ask inside _discard
+                try:
+                    _p, system, sig = self._locate(arg, at)
+                except ChainError:
+                    continue
+                conn = system.find_connection(sig.prefix)
+                if conn is not None and (
+                    conn.child.sigs or conn.child.connections
+                ):
+                    forced = "strike! " + " ".join(args)
+                    if at:
+                        forced += f" @{at}"
+                    question = (
+                        f"CONFIRM: {sig.prefix} leads to {conn.child.name}, "
+                        f"which still has mapped content. Strike the whole "
+                        f"branch? y/n  (sever keeps it adrift instead)"
+                    )
+                    self.pending_confirm = (question, forced)
+                    return question
         results = []
         for arg in args:
             if not sig_only:
@@ -534,19 +602,27 @@ class Session:
             raise ChainError(f"no fragment {which!r} on this chain")
         if len(self.chain.roots) == 1:
             raise ChainError("this is the only fragment — the map must map something")
-        if self.chain.location[0] == ri:
-            raise ChainError("you are inside that fragment — leave before striking it")
         fragment = self.chain.roots[ri]
         if (fragment.sigs or fragment.connections) and not force:
-            raise ChainError(
-                f"fragment #{ri + 1} ({fragment.name}) still has mapped content "
-                "— `strike!` to force"
+            question = (
+                f"CONFIRM: fragment #{ri + 1} ({fragment.name}) still has "
+                f"mapped content. Strike it whole? y/n"
             )
+            self.pending_confirm = (question, f"strike! #{ri + 1}")
+            return question
+        was_inside = self.chain.location[0] == ri
         self.chain.roots.pop(ri)
-        if self.chain.location[0] > ri:
+        relocated = ""
+        if was_inside:
+            self.chain.location = [0]
+            relocated = f" ◉ YOU relocated to {self.chain.current().name}."
+        elif self.chain.location[0] > ri:
             self.chain.location[0] -= 1
         self._commit()
-        return f"Fragment #{ri + 1} ({fragment.name}) struck from the record."
+        return (
+            f"Fragment #{ri + 1} ({fragment.name}) struck from the "
+            f"record.{relocated}"
+        )
 
     def _adopt_fragment(self, system: System, path: list, prefix: str,
                         frag_ri: int) -> str:
@@ -806,6 +882,25 @@ class Session:
                 f"record as {name}.{note}"
             )
 
+        if self._pending_trail:
+            # Already roaming unfiled: this jump extends (or retraces) the
+            # trail. The anchor stays where the record last saw you.
+            if name == self._pending_trail[-1]:
+                return None  # the same unfiled system, re-announced
+            if len(self._pending_trail) >= 2 and name == self._pending_trail[-2]:
+                self._pending_trail.pop()
+                depth = len(self._pending_trail)
+                return (
+                    f"Backtracked to unfiled {name} — trail now "
+                    f"{depth} jump{'s' if depth != 1 else ''} deep."
+                )
+            self._pending_trail.append(name)
+            depth = len(self._pending_trail)
+            return (
+                f"Arrived in UNMAPPED {name} — {depth} unfiled jumps "
+                f"queued. k files the whole trail, in order."
+            )
+
         if not unknown and len(unopened) == 1:
             # One scanned hole, one unaccounted arrival: file it through —
             # no placeholder, no rekey, no keypress.
@@ -843,14 +938,17 @@ class Session:
         return out
 
     def file_k162(self, via: str | None = None) -> str:
-        """File a pending unmapped arrival — through the hole you actually
-        took when the record can tell which one that was.
+        """File the unfiled arrival trail — every system jumped without
+        filing, in order. The first hop goes through the hole you actually
+        took when the record can tell which one that was; hops beyond it
+        are necessarily unscanned placeholders.
 
-        `via` names the passage explicitly; None auto-selects when exactly
-        one candidate exists; "!" insists on a fresh unscanned hole."""
-        if self.pending_arrival is None:
+        `via` names the first passage explicitly; None auto-selects when
+        exactly one candidate exists; "!" insists on a fresh hole."""
+        if not self._pending_trail:
             return "No unmapped arrival pending. The record is at peace."
-        name, from_path = self.pending_arrival
+        trail = list(self._pending_trail)
+        from_path = list(self._pending_from)
         origin = self.chain.system_at(from_path)
         fresh = via == "!"
         candidates = self.arrival_candidates()
@@ -866,46 +964,46 @@ class Session:
         elif not fresh and len(candidates) > 1:
             listing = " · ".join(candidates)
             return (
-                f"UNFILED: {name} — which passage out of {origin.name}? "
+                f"UNFILED: {trail[0]} — which passage out of {origin.name}? "
                 f"{listing}. Submit `k162 <sig>` (or click one in the "
                 f"dossier); `k162!` files a fresh unscanned hole."
             )
         else:
             via = None
+        notes = []
+        path = list(from_path)
+        for hop, name in enumerate(trail):
+            path, note = self._file_hop(path, name, via if hop == 0 else None)
+            notes.append(note)
+        self.chain.location = path
+        self.pending_arrival = None
+        self._commit()
+        if len(notes) == 1:
+            return notes[0]
+        return f"Filed {len(notes)} jumps: " + " ".join(notes)
+
+    def _file_hop(self, from_path: list, name: str,
+                  via: str | None) -> tuple[list, str]:
+        """One trail hop: open `name` out of from_path, through `via` or a
+        fresh placeholder. Returns (new path, filing note). No commit."""
+        origin = self.chain.system_at(from_path)
         if via is not None:
             conn = origin.find_connection(via)
             if conn is not None:
                 # A typed hole whose far side was never confirmed.
                 self._name_system(conn.child, name)
-                self.chain.location = list(from_path) + [via]
-                self.pending_arrival = None
-                self._commit()
-            else:
-                info = lookup_system(name)
-                saved = self.chain.location
-                self.chain.location = list(from_path)
-                try:
-                    self.chain.open_connection(
-                        via, info.jcode if info else name,
-                        jclass=info.jclass if info else None,
-                        statics=info.static_display if info else None,
-                        effect=info.effect if info else None,
-                        wh_type=None,
-                    )
-                except ChainError:
-                    self.chain.location = saved
-                    raise
-                self.chain.location = list(from_path) + [via]
-                self.pending_arrival = None
-                self._commit()
-            return f"Filed {name} through {via}. The record aligns."
-        prefix = self._placeholder_prefix(origin)
-        origin.sigs.append(
-            Signature(sig_id=f"{prefix}-000", group=SigGroup.WORMHOLE,
-                      label="hole (unscanned)")
-        )
+                return list(from_path) + [via], (
+                    f"{name} through {via} — the record aligns."
+                )
+            prefix = via
+        else:
+            prefix = self._placeholder_prefix(origin)
+            origin.sigs.append(
+                Signature(sig_id=f"{prefix}-000", group=SigGroup.WORMHOLE,
+                          label="hole (unscanned)")
+            )
         info = lookup_system(name)
-        saved_location = self.chain.location
+        saved = self.chain.location
         self.chain.location = list(from_path)
         try:
             self.chain.open_connection(
@@ -916,15 +1014,16 @@ class Session:
                 wh_type=None,
             )
         except ChainError:
-            self.chain.location = saved_location
+            self.chain.location = saved
             raise
-        self.chain.location = list(from_path) + [prefix]
-        self.pending_arrival = None
-        self._commit()
-        return (
-            f"Filed {name} via placeholder {prefix} — refile (`{prefix.lower()} "
-            "= abc`) when you scan the real signature."
-        )
+        if via is not None:
+            note = f"{name} through {via} — the record aligns."
+        else:
+            note = (
+                f"{name} via placeholder {prefix} — refile "
+                f"(`{prefix.lower()} = abc`) once scanned."
+            )
+        return list(from_path) + [prefix], note
 
     def find_matches(self, query: str) -> list[tuple]:
         """Tree-node data tuples matching a query: system names first,
@@ -1171,15 +1270,51 @@ class Session:
 
     # -- display helpers (UI-agnostic) ---------------------------------------
 
+    def _set_home(self, name: str) -> str:
+        """File a system as HOME — the homeward target, marked ⌂. Nomads
+        move house; the Bureau merely updates the paperwork."""
+        path = self._find_system(name)
+        if path is None:
+            raise ChainError(f"no system '{name}' on this chain")
+        actual = self.chain.system_at(path).name
+        self.chain.home = actual
+        self._commit()
+        return f"HOME filed: {actual} ⌂. `home` routes there; `home!` unfiles."
+
+    def home_path(self) -> list | None:
+        """The filed home's path, if it is on the chain right now."""
+        if self.chain.home is None:
+            return None
+        return self._find_system(self.chain.home)
+
     def homeward(self) -> str:
-        """The route from ◉ YOU back to the root, door by door — the return
-        sig where one is on file, otherwise the far side of the inbound hole."""
-        loc = self.chain.location
-        if len(loc) <= 1:
+        """The route from ◉ YOU to HOME (the filed system, or this
+        fragment's root), door by door — the return sig where one is on
+        file, otherwise the far side of the inbound hole."""
+        loc = list(self.chain.location)
+        dst = self.home_path()
+        adrift_note = ""
+        if dst is not None and dst[0] != loc[0]:
+            adrift_note = (
+                f"  ({self.chain.home} ⌂ lies in another fragment — "
+                f"routing to this fragment's root instead.)"
+            )
+            dst = None
+        if dst is None:
+            dst = [loc[0]]
+        if dst == loc:
             here = self.chain.current().name
-            return f"You are at the top of this fragment — {here}."
+            return f"You are HOME — {here} ⌂." if self.chain.home else (
+                f"You are at the top of this fragment — {here}."
+            )
+        # Walk up to the deepest common ancestor, then down to home.
+        common = 0
+        for a, b in zip(loc, dst):
+            if a != b:
+                break
+            common += 1
         steps = []
-        for i in range(len(loc), 1, -1):
+        for i in range(len(loc), common, -1):
             system = self.chain.system_at(loc[:i])
             parent = self.chain.system_at(loc[: i - 1])
             conn = parent.find_connection(loc[i - 1])
@@ -1189,11 +1324,15 @@ class Session:
                 else f"far side of {loc[i - 1]}"
             )
             steps.append(f"{system.name} ↩ {door}")
-        steps.append(self.chain.system_at([loc[0]]).name)
-        jumps = len(loc) - 1
+        steps.append(self.chain.system_at(loc[:common] or [loc[0]]).name)
+        for i in range(common, len(dst)):
+            steps[-1] += f" ▸ {dst[i]}"
+            steps.append(self.chain.system_at(dst[: i + 1]).name)
+        jumps = (len(loc) - common) + (len(dst) - common)
+        mark = " ⌂" if self.chain.home else ""
         return (
             f"HOMEWARD ({jumps} jump{'s' if jumps != 1 else ''}): "
-            + " → ".join(steps)
+            + " → ".join(steps) + mark + adrift_note
         )
 
     def breadcrumb(self) -> str:

@@ -55,8 +55,11 @@ def _visible(sig: Signature, view: str) -> bool:
 
 
 def system_label(system: System, here: bool, kinfo=None,
-                 pilots: tuple = (), now: datetime | None = None) -> str:
+                 pilots: tuple = (), now: datetime | None = None,
+                 home: bool = False) -> str:
     parts = [f"[bold {TEXT}]{system.name}[/bold {TEXT}]"]
+    if home:
+        parts.append(f"[{RUST}]⌂[/{RUST}]")
     meta = []
     if system.jclass:
         meta.append(system.jclass + (f"+{system.statics}" if system.statics else ""))
@@ -248,6 +251,7 @@ class ChainTree(Tree):
                 system, here=chain.location == list(path),
                 kinfo=self.session.kspace.get(system.name),
                 pilots=self._fleet(system.name),
+                home=chain.home == system.name,
             )
             if len(path) == 1:
                 label += self._root_suffix(path[0], system)
@@ -296,7 +300,8 @@ class ChainTree(Tree):
             node = self.root.add(
                 system_label(fragment, here=chain.location == [ri],
                              kinfo=self.session.kspace.get(fragment.name),
-                             pilots=self._fleet(fragment.name))
+                             pilots=self._fleet(fragment.name),
+                             home=chain.home == fragment.name)
                 + self._root_suffix(ri, fragment),
                 data=("system", [ri]),
             )
@@ -335,7 +340,8 @@ class ChainTree(Tree):
             child_node = sig_node.add(
                 system_label(conn.child, here=chain.location == child_path,
                              kinfo=self.session.kspace.get(conn.child.name),
-                             pilots=self._fleet(conn.child.name)),
+                             pilots=self._fleet(conn.child.name),
+                             home=chain.home == conn.child.name),
                 data=("system", child_path),
             )
             self._fill(child_node, conn.child, child_path,

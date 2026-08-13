@@ -68,6 +68,7 @@ class MapperApp(App):
         Binding("d", "sig_cmd('del')", "Strike", show=False),
         Binding("s", "sweep", "Sweep", show=True),
         Binding("y", "snap_to_you", "You", show=False),
+        Binding("n", "confirm_no", "Decline", show=False),
         Binding("h", "show_homeward", "Homeward", show=False),
         Binding("c", "copy_chain", "Copy", show=True),
         Binding("k", "file_k162", "File K162", show=False),
@@ -253,11 +254,7 @@ class MapperApp(App):
         self.query_one(VagariHeader).update_state(
             self.session.chain.name,
             self.session.breadcrumb(),
-            pending_arrival=(
-                self.session.pending_arrival[0]
-                if self.session.pending_arrival
-                else None
-            ),
+            pending_arrival=self.session.pending_display(),
             pilot=self.session.pilot_lock,
             follow_active=getattr(self, "_follow_active", False),
             despawned=(
@@ -547,6 +544,10 @@ class MapperApp(App):
     def action_file_k162(self) -> None:
         self._after_engine(self.session.file_k162())
 
+    def action_confirm_no(self) -> None:
+        if self.session.pending_confirm is not None:
+            self._after_engine(self.session.execute("n"))
+
     def action_copy_route(self) -> None:
         self.copy_to_clipboard(self.session.homeward())
         self.status("Route copied to clipboard. Distribute to the lost.")
@@ -588,6 +589,10 @@ class MapperApp(App):
         self.query_one(ChainTree).move_to_data(("sig", path, prefix))
 
     def action_snap_to_you(self) -> None:
+        # A pending y/n outranks the snap — y answers the question.
+        if self.session.pending_confirm is not None:
+            self._after_engine(self.session.execute("y"))
+            return
         tree = self.query_one(ChainTree)
         if tree.move_to_data(("system", list(self.session.chain.location))):
             self.status(f"Cursor on ◉ YOU — {self.session.chain.current().name}.")

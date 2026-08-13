@@ -497,3 +497,30 @@ async def test_pairing_correctable_from_both_dossiers(tmp_path):
         await pilot.pause()
         assert s.chain.root.find_connection("XPA").return_prefix is None
         assert "paired return" not in str(panel.content)
+
+
+@pytest.mark.asyncio
+async def test_y_and_n_keys_answer_pending_confirmation(tmp_path):
+    """With a question pending, y confirms (outranking snap-to-you) and
+    n declines; without one, y still snaps."""
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await paste(app, pilot, "paste_mixed.txt")
+        app.session.execute("qlm J154535")
+        app.session.execute("nav qlm")
+        app.session.ingest("AAA-111\tCosmic Signature\tRelic Site\t\t50.0%\t1 AU")
+        app.session.execute("top")
+        app.refresh_all()
+        await pilot.pause()
+
+        q = app.session.execute("strike qlm")
+        assert "CONFIRM" in q
+        await pilot.press("n")
+        await pilot.pause()
+        assert app.session.pending_confirm is None
+        assert app.session.chain.root.find_sig("QLM") is not None
+
+        app.session.execute("strike qlm")
+        await pilot.press("y")
+        await pilot.pause()
+        assert app.session.chain.root.find_sig("QLM") is None

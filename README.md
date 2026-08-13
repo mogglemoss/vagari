@@ -39,7 +39,7 @@ THE BUREAU IS MERELY NOTING.
 
 Every deposit also reports which signatures have despawned; press `s` (or submit `sweep`) to strike them from the record. A wormhole with mapped systems behind it is never struck by a sweep. The Bureau does not shred files that other files refer to.
 
-**The map follows you.** VAGARI tails your EVE chat logs (locally; Fenris Creations writes them precisely so tools may read them — enable "Log chat to file" in EVE's settings) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Multiboxing is understood: every client's log is watched, each tagged with its pilot, and the Bureau follows the first pilot who actually jumps — the one being flown, not the one spamming Jita local. `pilot` reports the roster; `pilot <name>` locks to a character (`VAGARI_PILOT` env for a standing order); `pilot off` releases. Arrive somewhere unmapped and the Bureau files it through the hole you took: if exactly one scanned passage fits, the arrival files itself — destination class, statics, and weather already annotated, no keypress required. When more than one passage could be yours, the dossier lists them as click targets (`k162 <sig>` from the keyboard); `k162!` insists on a fresh unscanned hole, and press `k` when nothing was scanned at all. The first scan you deposit in a fresh system pairs its lone wormhole as your return hole automatically — it is the first thing a pilot scans — with `return <sig>` to restate it; two holes in that first scan and the Bureau declines to guess. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
+**The map follows you.** VAGARI tails your EVE chat logs (locally; Fenris Creations writes them precisely so tools may read them — enable "Log chat to file" in EVE's settings) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Multiboxing is understood: every client's log is watched, each tagged with its pilot, and the Bureau follows the first pilot who actually jumps — the one being flown, not the one spamming Jita local. `pilot` reports the roster; `pilot <name>` locks to a character (`VAGARI_PILOT` env for a standing order); `pilot off` releases. Arrive somewhere unmapped and the Bureau files it through the hole you took: if exactly one scanned passage fits, the arrival files itself — destination class, statics, and weather already annotated, no keypress required. When more than one passage could be yours, the dossier lists them as click targets (`k162 <sig>` from the keyboard); `k162!` insists on a fresh unscanned hole, and press `k` when nothing was scanned at all. Jump several unmapped systems without filing and the arrivals queue as a TRAIL — `k` files them all, in order, and backtracking through the trail pops it. The first scan you deposit in a fresh system pairs its lone wormhole as your return hole automatically — it is the first thing a pilot scans — with `return <sig>` to restate it; two holes in that first scan and the Bureau declines to guess. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
 
 **Wormholes carry countdowns.** Type a hole (`abc H296`) and it knows its target class, mass, size, and book lifetime. The tree shows an upper-bound countdown — `≤13h04m` — amber when waning, and `EXPIRED?` when the paperwork has outlived the physics. Mark end-of-life in one key and the four-hour clock runs from that moment — two hours later the badge honestly reads `≤2h`. The bound is honest: it counts from when *you* first mapped the hole, which is the only fact the Bureau actually possesses.
 
@@ -107,13 +107,13 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `abc H296` | type wormhole ABC (target class, lifetime, mass) |
 | `abc <words>` | label a signature |
 | `return abc [TYPE]` | pair ABC with its system's inbound hole (+true type read there) |
-| `sever abc` | collapsed hole: far side becomes an adrift fragment |
+| `sever abc` | the opposite of strike: cut the hole, KEEP the far side adrift |
 | `fragment [name]` | file a disconnected fragment (or a pending arrival) |
-| `strike vard` / `strike #2` | strike a fragment whole — by name or #number; `d` on its header |
+| `strike vard` / `strike #2` | strike a fragment whole — by name or #number; `d` on its header; works from inside |
 | `copy route` | homeward route to the clipboard |
 | `… @system` | address a sig elsewhere in the chain (else: current, then unique) |
 | `here <name>` | name the current system |
-| `flag abc` / `strike abc` | flag · strike a sig (`strike!` forces; `del` is an alias) |
+| `flag abc` / `strike abc` | flag · strike a sig (mapped content asks y/n; `del`/`discard` accepted) |
 | `eol abc` / `crit abc` | toggle end-of-life · cycle mass state |
 | `k162 [abc]` · `k abc` | file a pending arrival through the hole you took |
 | `chain <name>` | switch chain of custody |

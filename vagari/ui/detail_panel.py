@@ -309,6 +309,8 @@ class DetailPanel(VerticalScroll):
     def _show_system(self, system: System, path: list | None = None) -> None:
         current = path is not None and list(path) == list(self.session.chain.location)
         title = f"[bold {RUST}]{system.name}[/bold {RUST}]"
+        if self.session.chain.home == system.name:
+            title += f"  [{RUST}]⌂ HOME[/{RUST}]"
         if current:
             title += f"  [{RUST}]◉ YOU ARE HERE[/{RUST}]"
         head = [title]
@@ -327,6 +329,13 @@ class DetailPanel(VerticalScroll):
             actions.append(_link("intel", "run_cmd('intel')"))
         if not is_root and system.name and not system.name.startswith("?"):
             actions.append(_link("strike", f"run_cmd('strike {system.name}')"))
+        if system.name and not system.name.startswith("?"):
+            if self.session.chain.home == system.name:
+                actions.append(_link("unset home", "run_cmd('home!')"))
+            else:
+                actions.append(
+                    _link("set home", f"run_cmd('home {system.name}')")
+                )
         if actions:
             head.append(f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions))
         pending = self.session.pending_arrival

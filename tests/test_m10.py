@@ -116,10 +116,10 @@ def test_discard_fragment(session):
     session.execute("fragment J100744")
     session.execute("chain" if False else "top")
     assert len(session.chain.roots) == 2
-    # Cannot discard the fragment you occupy.
-    assert "inside" in session.execute("discard 2")
-    session.chain.location = [0]
-    assert "struck" in session.execute("discard 2")
+    # Striking the fragment you occupy relocates ◉ YOU out of it first.
+    msg = session.execute("discard 2")
+    assert "struck" in msg and "relocated" in msg
+    assert session.chain.location == [0]
     assert len(session.chain.roots) == 1
     assert "only fragment" in session.execute("discard 1")
 
@@ -132,8 +132,14 @@ def test_discard_guards_content(session):
         )
     )
     session.chain.location = [0]
-    assert "strike!" in session.execute("discard 2")
-    assert "struck" in session.execute("discard! 2")
+    q = session.execute("discard 2")
+    assert "CONFIRM" in q and "y/n" in q
+    assert len(session.chain.roots) == 2         # a question mutates nothing
+    assert "stands" in session.execute("n")      # declined
+    assert len(session.chain.roots) == 2
+    session.execute("discard 2")
+    assert "struck" in session.execute("y")      # confirmed
+    assert len(session.chain.roots) == 1
 
 
 def test_adrift_age_stamped(session):

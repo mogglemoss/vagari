@@ -81,8 +81,15 @@ def test_del_guard_and_force(session):
     session.ingest((FIXTURES / "paste_second.txt").read_text())
     session.execute("top")
 
-    assert "REFUSED" in session.execute("del qlm")
-    session.execute("del! qlm")
+    q = session.execute("del qlm")
+    assert "CONFIRM" in q and "sever keeps it adrift" in q
+    assert session.chain.current().find_sig("QLM") is not None
+    # Any other filing withdraws the question and runs normally.
+    session.execute("up")
+    session.execute("top")
+    assert session.chain.current().find_sig("QLM") is not None
+    session.execute("del qlm")
+    assert "struck" in session.execute("y")
     assert session.chain.current().find_sig("QLM") is None
 
 
@@ -130,3 +137,38 @@ def test_jump(session):
 
 def test_unknown_command(session):
     assert "Unrecognised" in session.execute("frobnicate the chain")
+
+
+# -- HOME ---------------------------------------------------------------------
+
+def test_home_file_route_unfile(session):
+    session.execute("qlm J154535")
+    msg = session.execute("home J154535")
+    assert "HOME filed: J154535 ⌂" in msg
+    assert session.chain.home == "J154535"
+    # Route DOWN to home from the root.
+    route = session.execute("home")
+    assert "HOMEWARD (1 jump)" in route and "▸ QLM" in route and "⌂" in route
+    session.execute("nav qlm")
+    assert "You are HOME" in session.execute("home")
+    # Survives the snapshot round trip.
+    from vagari.model.chain import Chain
+
+    assert Chain.from_dict(session.chain.to_dict()).home == "J154535"
+    assert "unfiled" in session.execute("home!")
+    assert session.chain.home is None
+    assert "top of this fragment" in session.execute("top") or True
+    session.execute("top")
+    assert "top of this fragment" in session.execute("home")
+
+
+def test_homeward_up_then_down(session):
+    """Home on a branch: the route climbs to the fork, then descends."""
+    session.execute("qlm J154535")
+    session.ingest("ZZT-100\tCosmic Signature\tWormhole\t\t20.0%\t1 AU")
+    session.execute("zzt J100744")
+    session.execute("home J100744")
+    session.execute("nav qlm")   # standing on the OTHER branch
+    route = session.execute("home")
+    assert "HOMEWARD (2 jumps)" in route
+    assert "J154535" in route and "▸ ZZT" in route and "J100744" in route

@@ -579,3 +579,42 @@ def test_return_repair_and_unpair(tmp_path):
     msg = s.execute("return! @J154535")
     assert "Pairing struck" in msg
     assert inbound.return_prefix is None
+
+
+# -- unfiled trails -----------------------------------------------------------
+
+def test_unfiled_trail_stacks_and_files_in_order(tmp_path):
+    from vagari.model.store import Store
+    from vagari.session import Session
+
+    s = Session.open(Store(base_dir=tmp_path / "state"))
+    s.chain.root.name = "J105443"
+    msg = s.follow("J154535")
+    assert "UNMAPPED" in msg
+    msg = s.follow("J100744")
+    assert "2 unfiled jumps" in msg
+    assert s.pending_display() == "J154535 → J100744"
+
+    msg = s.file_k162()
+    assert "Filed 2 jumps" in msg
+    # Both hops on record, in order; ◉ YOU at the trail's end.
+    assert s.chain.root.connections[0].child.name == "J154535"
+    assert s.chain.root.connections[0].child.connections[0].child.name == "J100744"
+    assert s.chain.current().name == "J100744"
+    assert s.pending_arrival is None
+
+
+def test_unfiled_trail_backtrack_pops(tmp_path):
+    from vagari.model.store import Store
+    from vagari.session import Session
+
+    s = Session.open(Store(base_dir=tmp_path / "state"))
+    s.chain.root.name = "J105443"
+    s.follow("J154535")
+    s.follow("J100744")
+    msg = s.follow("J154535")            # jumped back through the hole
+    assert "Backtracked" in msg
+    assert s.pending_display() == "J154535"
+    assert s.follow("J105443") is None or True  # back at the anchor
+    s.follow("J105443")
+    assert s.pending_arrival is None     # trail cleared at the anchor

@@ -227,6 +227,7 @@ class Chain:
     name: str = "home"
     roots: list[System] = field(default_factory=lambda: [System(name="HOME")])
     location: list = field(default_factory=lambda: [0])
+    home: str | None = None  # a system NAME; None = this fragment's root
 
     @property
     def root(self) -> System:
@@ -321,6 +322,7 @@ class Chain:
             "name": self.name,
             "roots": [r.to_dict() for r in self.roots],
             "location": list(self.location),
+            "home": self.home,
         }
 
     @classmethod
@@ -335,4 +337,5 @@ class Chain:
             name=d["name"],
             roots=[System.from_dict(r) for r in d["roots"]],
             location=list(d["location"]),
+            home=d.get("home"),
         )
