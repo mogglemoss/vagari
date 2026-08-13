@@ -645,11 +645,11 @@ def test_life_and_mass_grammar_file_readings(tmp_path):
     inbound = s.chain.root.find_connection("XPA")
 
     msg = s.execute("life xpa <24")
-    assert "less than a day" in msg
+    assert "less than 1 day" in msg
     assert inbound.life_seen == "waning" and not inbound.eol
 
     msg = s.execute("life ina <4")     # via the paired return: same hole
-    assert "under 4 hours" in msg
+    assert "less than 4 hours" in msg
     assert inbound.eol and inbound.life_seen is None
 
     s.execute("life xpa >24")

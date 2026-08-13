@@ -113,6 +113,14 @@ def load_systems() -> dict[str, SystemInfo]:
 _kspace_cache: dict | None = None
 
 
+def kspace_names() -> list[str]:
+    """Every charted k-space system name, proper-cased, sorted."""
+    global _kspace_cache
+    if _kspace_cache is None:
+        _kspace_cache = _data("kspace.json")
+    return sorted(v[0] for v in _kspace_cache.values())
+
+
 def lookup_kspace(name: str):
     """K-space system by name, case-insensitive — (proper name, system id,
     true sec, region) from the bundled SDE extract, or None."""

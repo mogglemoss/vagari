@@ -676,31 +676,42 @@ class DetailPanel(VerticalScroll):
                 lines.append(f"  [bold {DIM}]END OF LIFE[/bold {DIM}]")
 
             # Click-to-file the in-game info window, both readings.
-            def reading(label: str, cmd: str, active: bool) -> str:
+            def reading(label: str, cmd: str, active: bool,
+                        presumed: bool = False) -> str:
                 if active:
                     return f"[bold {RUST}]{label}[/bold {RUST}]"
+                if presumed:  # the game's resting state, nothing filed yet
+                    return (
+                        f"[bold {MUTED}][@click=app.run_cmd('{cmd}"
+                        f"{qualifier}')]{label}[/][/bold {MUTED}]"
+                    )
                 return _link(label, f"run_cmd('{cmd}{qualifier}')")
 
             p = sig.prefix.lower()
-            life_state = "eol" if conn.eol else (conn.life_seen or "")
+            life_state = conn.life_seen or ("eol" if conn.eol else "")
+            if conn.eol and conn.life_seen != "hour":
+                life_state = "eol"
             lines.append(
                 f"  [{DIM}]file life:[/{DIM}] "
                 + f" [{DIM}]·[/{DIM}] ".join([
-                    reading(">24h", f"life {p} >24", life_state == "day"),
-                    reading("<24h", f"life {p} <24", life_state == "waning"),
+                    reading(">1 day", f"life {p} >24", life_state == "day"),
+                    reading("<1 day", f"life {p} <24",
+                            life_state == "waning",
+                            presumed=not life_state),
                     reading("<4h", f"life {p} <4", life_state == "eol"),
-                    reading("imminent", f"life {p} gone",
+                    reading("<1h", f"life {p} <1", life_state == "hour"),
+                    reading("expired", f"life {p} gone",
                             life_state == "expired"),
                 ])
             )
             lines.append(
                 f"  [{DIM}]file mass:[/{DIM}] "
                 + f" [{DIM}]·[/{DIM}] ".join([
-                    reading("fresh", f"mass {p} fresh",
+                    reading(">50%", f"mass {p} >50",
                             conn.mass.value == "fresh"),
-                    reading("reduced", f"mass {p} reduced",
+                    reading("<50%", f"mass {p} <50",
                             conn.mass.value == "reduced"),
-                    reading("critical", f"mass {p} critical",
+                    reading("<10%", f"mass {p} <10",
                             conn.mass.value == "critical"),
                 ])
             )

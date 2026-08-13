@@ -69,10 +69,10 @@ REGISTRY: list[Command] = [
                                          "strike!")),
     Command("eol", "eol abc", "toggle end-of-life; the 4h clock runs from "
             "the marking", "record", keys="e"),
-    Command("life", "life abc >24 · <24 · <4 · gone", "file the in-game "
-            "lifetime reading as observed", "record"),
-    Command("crit", "crit abc [fresh · reduced · critical]", "cycle mass — "
-            "or file the in-game reading directly", "record", keys="m",
+    Command("life", "life abc >24 · <24 · <4 · <1 · gone", "file the "
+            "in-game lifetime reading as observed", "record"),
+    Command("crit", "crit abc [>50 · <50 · <10]", "cycle mass — or file "
+            "the in-game reading directly", "record", keys="m",
             aliases=("mass",)),
     Command("rekey", "zaa = abc", "refile a placeholder under its real sig",
             "record"),

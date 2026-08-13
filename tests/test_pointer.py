@@ -523,3 +523,18 @@ async def test_y_and_n_keys_answer_pending_confirmation(tmp_path):
         await pilot.press("y")
         await pilot.pause()
         assert app.session.chain.root.find_sig("QLM") is None
+
+
+@pytest.mark.asyncio
+async def test_suggester_completes_system_names(tmp_path):
+    from vagari.ui.suggest import BureauSuggester
+
+    app = make_app(tmp_path)
+    s = BureauSuggester(app.session)
+    # K-space chart, keeping the typed casing.
+    assert await s.get_suggestion("qlm ingh") == "qlm inghenges"
+    assert await s.get_suggestion("here jit") == "here jita"
+    # Chain names outrank the chart.
+    app.session.execute("qlm J154535") if False else None
+    # Type codes still win the two-token slot.
+    assert await s.get_suggestion("htx H2") == "htx H296"

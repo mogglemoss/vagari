@@ -388,10 +388,14 @@ class Session:
         state = "END OF LIFE (≤4h from now)" if conn.eol else "no longer EOL"
         return f"{conn.sig_prefix} ({system.name}) marked {state}."
 
+    # In-game readings, current client wording (simplified in 23.01):
+    # "More/Less than 1 day", "Less than 4 hours", "Less than 1 hour",
+    # "Expired, closure imminent".
     _LIFE_WORDS = {
         ">24": "day", "24+": "day", "day": "day",
         "<24": "waning", "24-": "waning", "waning": "waning",
         "<4": "eol", "4-": "eol", "eol": "eol",
+        "<1": "hour", "1-": "hour", "hour": "hour",
         "gone": "expired", "expired": "expired", "imminent": "expired",
     }
 
@@ -400,32 +404,40 @@ class Session:
         state = self._LIFE_WORDS.get(word.lower())
         if state is None:
             raise ChainError(
-                f"lifetime reads: >24 · <24 · <4 · gone (not {word!r})"
+                f"lifetime reads: >24 · <24 · <4 · <1 · gone (not {word!r})"
             )
         system, conn = self._connection_of(prefix, at)
-        if state == "eol":
+        if state in ("eol", "hour"):
             if not conn.eol:
                 conn.eol = True
                 conn.eol_marked_at = utcnow()
-            conn.life_seen = None
-            conn.life_seen_at = None
-            note = "under 4 hours — the clock runs from now"
+            conn.life_seen = "hour" if state == "hour" else None
+            conn.life_seen_at = utcnow() if state == "hour" else None
+            note = (
+                "less than 1 hour remaining"
+                if state == "hour"
+                else "less than 4 hours remaining — the clock runs"
+            )
         else:
             conn.eol = False
             conn.eol_marked_at = None
             conn.life_seen = state
             conn.life_seen_at = utcnow()
             note = {
-                "day": "at least another day on it",
-                "waning": "less than a day left",
-                "expired": "closure imminent — verify and cull",
+                "day": "more than 1 day remaining",
+                "waning": "less than 1 day remaining",
+                "expired": "expired — closure imminent; verify and cull",
             }[state]
         self._commit()
         return f"{conn.sig_prefix} ({system.name}) lifetime filed: {note}."
 
+    # Mass: "More than 50%", "Less than 50%", "Less than 10%" remaining.
     _MASS_WORDS = {
+        ">50": MassState.FRESH, "50+": MassState.FRESH,
         "fresh": MassState.FRESH, "ok": MassState.FRESH,
+        "<50": MassState.REDUCED, "50-": MassState.REDUCED,
         "reduced": MassState.REDUCED, "half": MassState.REDUCED,
+        "<10": MassState.CRITICAL, "10-": MassState.CRITICAL,
         "critical": MassState.CRITICAL, "crit": MassState.CRITICAL,
         "verge": MassState.CRITICAL,
     }
@@ -754,15 +766,8 @@ class Session:
         from vagari.enrichers.kspace import KSpaceInfo
 
         name, system_id, sec, region = kinfo
-        path, system, _sig = self._locate(prefix, at)
-        saved = self.chain.location
-        self.chain.location = list(path)
-        try:
-            self.chain.open_connection(prefix, name)
-        except ChainError:
-            self.chain.location = saved
-            raise
-        self.chain.location = saved
+        _path, system, _sig = self._locate(prefix, at)
+        self._open_at(system, prefix, name)
         self.kspace[name] = KSpaceInfo(system_id, sec, region)
         self._commit()
         band = self.kspace[name].band
@@ -808,8 +813,22 @@ class Session:
     def _open_at(self, system: System, prefix: str, dest: str, *,
                  jclass=None, statics=None, effect=None, wh_type=None) -> Connection:
         sig = self._require_prefix(system, prefix)
-        if system.find_connection(prefix) is not None:
-            raise ChainError(f"{sig.prefix} is already opened")
+        conn = system.find_connection(prefix)
+        if conn is not None:
+            if conn.child.name.startswith("?"):
+                # The hole is open but the far side was never identified —
+                # a destination completes the record, it does not conflict.
+                conn.child.name = dest
+                conn.child.jclass = jclass or conn.child.jclass
+                conn.child.statics = statics or conn.child.statics
+                conn.child.effect = effect or conn.child.effect
+                if wh_type:
+                    conn.wh_type = wh_type
+                return conn
+            raise ChainError(
+                f"{sig.prefix} is already opened to {conn.child.name} — "
+                f"strike or sever it first"
+            )
         sig.group = SigGroup.WORMHOLE
         child = System(name=dest, jclass=jclass, statics=statics, effect=effect)
         conn = Connection(sig_prefix=sig.prefix, child=child, wh_type=wh_type)

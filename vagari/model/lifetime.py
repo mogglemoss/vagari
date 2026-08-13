@@ -52,12 +52,16 @@ def assess(conn: Connection, now: datetime | None = None) -> Life:
     if wh_type is None or not wh_type.lifetime_hours:
         if conn.eol:
             # Untyped holes (K162s) still get the 4h clock from marking.
+            caps = [WANING_HOURS]
             if conn.eol_marked_at is not None:
-                left = WANING_HOURS - (
+                caps.append(WANING_HOURS - (
                     (t - conn.eol_marked_at).total_seconds() / 3600
+                ))
+            if conn.life_seen == "hour" and conn.life_seen_at is not None:
+                caps.append(
+                    1.0 - (t - conn.life_seen_at).total_seconds() / 3600
                 )
-                return Life(LifeStatus.EOL, None, max(0.0, left))
-            return Life(LifeStatus.EOL, None, WANING_HOURS)
+            return Life(LifeStatus.EOL, None, max(0.0, min(caps)))
         if seen_cap is not None:
             status = (
                 LifeStatus.WANING if seen_cap < WANING_HOURS
@@ -78,13 +82,18 @@ def assess(conn: Connection, now: datetime | None = None) -> Life:
 
     if conn.eol:
         # In-game EOL means under ~4h from the moment it was NOTICED —
-        # count down from the marking, bounded by the book estimate.
+        # count down from the marking, bounded by the book estimate. A
+        # filed "less than 1 hour" reading tightens the cap further.
+        caps = [remaining]
         if conn.eol_marked_at is not None:
-            eol_left = WANING_HOURS - (
-                ((now or utcnow()) - conn.eol_marked_at).total_seconds() / 3600
-            )
-            return Life(LifeStatus.EOL, total, max(0.0, min(remaining, eol_left)))
-        return Life(LifeStatus.EOL, total, min(remaining, WANING_HOURS))
+            caps.append(WANING_HOURS - (
+                (t - conn.eol_marked_at).total_seconds() / 3600
+            ))
+        else:
+            caps.append(WANING_HOURS)
+        if conn.life_seen == "hour" and conn.life_seen_at is not None:
+            caps.append(1.0 - (t - conn.life_seen_at).total_seconds() / 3600)
+        return Life(LifeStatus.EOL, total, max(0.0, min(caps)))
     if remaining <= 0:
         return Life(LifeStatus.EXPIRED, total, 0.0)
     if remaining < WANING_HOURS:
