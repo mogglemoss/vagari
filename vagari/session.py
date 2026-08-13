@@ -601,7 +601,25 @@ class Session:
         if ri is None or not 0 <= ri < len(self.chain.roots):
             raise ChainError(f"no fragment {which!r} on this chain")
         if len(self.chain.roots) == 1:
-            raise ChainError("this is the only fragment — the map must map something")
+            fragment = self.chain.roots[0]
+            if (fragment.sigs or fragment.connections) and not force:
+                question = (
+                    f"CONFIRM: {fragment.name} is the only fragment — "
+                    f"striking it resets the map to an empty root. y/n"
+                )
+                self.pending_confirm = (question, "strike! #1")
+                return question
+            struck = fragment.name
+            self.chain.roots = [System(name="HOME")]
+            self.chain.location = [0]
+            if self.chain.home == struck:
+                self.chain.home = None
+            self.pending_arrival = None
+            self._commit()
+            return (
+                f"{struck} struck; the map begins again. The next system "
+                f"observed (or `here <name>`) names the fresh root."
+            )
         fragment = self.chain.roots[ri]
         if (fragment.sigs or fragment.connections) and not force:
             question = (

@@ -102,10 +102,7 @@ class MapperApp(App):
         special = {
             "sweep": self.action_sweep,
             "cull": lambda: self._after_engine(self.session.execute("cull")),
-            "recon": lambda: self.run_worker(
-                self._refresh_activity(), exclusive=True, group="recon"
-            ),
-            "request_intel": self._request_intel,
+            "recon": self.action_recon,
         }
         for c in REGISTRY:
             if not c.palette:
@@ -307,12 +304,8 @@ class MapperApp(App):
         if text in ("copy route", "copy home", "route copy"):
             self.action_copy_route()
             return
-        if text == "recon":
-            self.status("Reconnaissance dispatched…")
-            self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
-            return
-        if text == "intel":
-            self._request_intel()
+        if text in ("recon", "intel"):
+            self.action_recon()
             return
         if text.startswith("/") or text.lower().startswith("find "):
             query = text[1:] if text.startswith("/") else text[5:]
@@ -424,6 +417,35 @@ class MapperApp(App):
         self.query_one(DetailPanel).show_node(matches[index])
         again = " — `/` and Enter again for the next" if len(matches) > 1 else ""
         self.status(f"Match {index + 1}/{len(matches)} for {query!r}{again}.")
+
+    def action_recon(self) -> None:
+        """One reconnaissance verb: the ESI activity sweep for every
+        system, plus a fresh killboard dossier for whatever the dossier
+        is showing (falling back to the current system)."""
+        self.status("Reconnaissance dispatched…")
+        self.run_worker(self._refresh_activity(), exclusive=True, group="recon")
+        from vagari.parsers.catalog import lookup_system
+
+        data = self.query_one(DetailPanel)._showing
+        system = None
+        if data is not None:
+            try:
+                path = data[1]
+                system = self.session.chain.system_at(list(path))
+            except Exception:
+                system = None
+        if system is None:
+            system = self.session.chain.current()
+        info = lookup_system(system.name)
+        kinfo = self.session.kspace.get(system.name)
+        system_id = info.system_id if info else (
+            kinfo.system_id if kinfo else None
+        )
+        if system_id is not None:
+            self.run_worker(
+                self._fetch_intel(system.name, system_id, announce=False),
+                group="intel",
+            )
 
     def _request_intel(self) -> None:
         from vagari.parsers.catalog import lookup_system

@@ -104,11 +104,10 @@ REGISTRY: list[Command] = [
     # follow-me
     Command("pilot", "pilot [name|off]", "who follow-me follows; first to "
             "jump otherwise", "follow"),
-    Command("recon", "recon", "refresh system activity (ESI); watchtower "
-            "alerts on new hostility", "follow", palette="Recon: refresh "
-            "activity", action="recon"),
-    Command("intel", "intel", "zKill dossier for the current system",
-            "follow", palette="Intel: zKill dossier", action="request_intel"),
+    Command("recon", "recon", "refresh the picture: last-hour activity "
+            "for every system (watchtower alerts) + killboard for the "
+            "system on display", "follow", palette="Recon: refresh "
+            "activity", action="recon", aliases=("intel",)),
     # meta ("Tab / :" lives under "how to drive it" on the reference screen)
     Command("", "?", "this reference", "meta", keys="?",
             palette="Reference", action="show_help"),

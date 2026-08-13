@@ -56,7 +56,7 @@ def _visible(sig: Signature, view: str) -> bool:
 
 def system_label(system: System, here: bool, kinfo=None,
                  pilots: tuple = (), now: datetime | None = None,
-                 home: bool = False) -> str:
+                 home: bool = False, unfiled: str | None = None) -> str:
     parts = [f"[bold {TEXT}]{system.name}[/bold {TEXT}]"]
     if home:
         parts.append(f"[{RUST}]⌂[/{RUST}]")
@@ -79,6 +79,11 @@ def system_label(system: System, here: bool, kinfo=None,
             )
     if here:
         parts.append(f"[bold {RUST}]◉ YOU[/bold {RUST}]")
+    if unfiled:
+        parts.append(
+            f"[bold {WARN}]✈ pilot beyond, unfiled: {unfiled} — k files "
+            f"it[/bold {WARN}]"
+        )
     for name in pilots:
         parts.append(f"[{WARN}]◎ {name}[/{WARN}]")
     return "  ".join(parts)
@@ -197,6 +202,14 @@ class ChainTree(Tree):
             return True
         return False
 
+    def _unfiled(self, path: list) -> str | None:
+        """The unfiled trail, shown on the system it is anchored to — the
+        map must not pretend ◉ YOU is the pilot's true position."""
+        pending = self.session.pending_arrival
+        if pending is not None and list(path) == list(pending[1]):
+            return self.session.pending_display()
+        return None
+
     def _fleet(self, system_name: str) -> tuple:
         return tuple(
             p for p, s in sorted(self.session.known_pilots.items())
@@ -252,6 +265,7 @@ class ChainTree(Tree):
                 kinfo=self.session.kspace.get(system.name),
                 pilots=self._fleet(system.name),
                 home=chain.home == system.name,
+                unfiled=self._unfiled(path),
             )
             if len(path) == 1:
                 label += self._root_suffix(path[0], system)
@@ -301,7 +315,8 @@ class ChainTree(Tree):
                 system_label(fragment, here=chain.location == [ri],
                              kinfo=self.session.kspace.get(fragment.name),
                              pilots=self._fleet(fragment.name),
-                             home=chain.home == fragment.name)
+                             home=chain.home == fragment.name,
+                             unfiled=self._unfiled([ri]))
                 + self._root_suffix(ri, fragment),
                 data=("system", [ri]),
             )
@@ -341,7 +356,8 @@ class ChainTree(Tree):
                 system_label(conn.child, here=chain.location == child_path,
                              kinfo=self.session.kspace.get(conn.child.name),
                              pilots=self._fleet(conn.child.name),
-                             home=chain.home == conn.child.name),
+                             home=chain.home == conn.child.name,
+                             unfiled=self._unfiled(child_path)),
                 data=("system", child_path),
             )
             self._fill(child_node, conn.child, child_path,

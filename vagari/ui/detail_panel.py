@@ -326,7 +326,6 @@ class DetailPanel(VerticalScroll):
             actions.append(_link("nav", "nav_selected", RUST))
         if current:
             actions.append(_link("recon", "run_cmd('recon')"))
-            actions.append(_link("intel", "run_cmd('intel')"))
         if not is_root and system.name and not system.name.startswith("?"):
             actions.append(_link("strike", f"run_cmd('strike {system.name}')"))
         if system.name and not system.name.startswith("?"):

@@ -180,3 +180,18 @@ async def test_d_key_discards_selected_fragment(tmp_path):
         await pilot.press("d")
         await pilot.pause()
         assert len(app.session.chain.roots) == 1
+
+
+def test_striking_only_fragment_resets_map(session):
+    """The map must map something — so striking the last fragment begins
+    a fresh one instead of refusing, leaving no bogus root to be stuck in."""
+    q = session.execute("strike J105443")
+    assert "CONFIRM" in q and "resets the map" in q
+    assert session.chain.root.name == "J105443"    # question mutates nothing
+    session.execute("y")
+    assert session.chain.root.name == "HOME"
+    assert session.chain.root.sigs == []
+    assert session.chain.location == [0]
+    # Fresh-chain naming re-arms: the next observed system names the root.
+    session.follow("J103529")
+    assert session.chain.root.name == "J103529"
