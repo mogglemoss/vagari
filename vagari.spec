@@ -14,6 +14,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ("vagari/data/systems.json", "vagari/data"),
+        ("vagari/data/kspace.json", "vagari/data"),
         ("vagari/data/wormhole_types.json", "vagari/data"),
         ("vagari/data/effects.json", "vagari/data"),
         ("vagari/data/classes.json", "vagari/data"),

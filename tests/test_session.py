@@ -172,3 +172,45 @@ def test_homeward_up_then_down(session):
     route = session.execute("home")
     assert "HOMEWARD (2 jumps)" in route
     assert "J154535" in route and "▸ ZZT" in route and "J100744" in route
+
+
+# -- k-space destinations -----------------------------------------------------
+
+def test_sig_opens_to_kspace_name(session):
+    msg = session.execute("qlm tzvi")
+    assert "opens to Tzvi" in msg and "0.3 L-sec" in msg and "Devoid" in msg
+    conn = session.chain.root.find_connection("QLM")
+    assert conn is not None and conn.child.name == "Tzvi"
+    assert session.kspace["Tzvi"].band == "L"
+    # Words that chart nothing still label.
+    session.ingest("ZZT-100\tCosmic Signature\tWormhole\t\t20.0%\t1 AU")
+    msg = session.execute("zzt definitely not a system")
+    assert "labelled" in msg
+
+
+def test_here_canonicalizes_kspace_name(session):
+    msg = session.execute("here jita")
+    assert "Jita" in msg
+    assert session.chain.current().name == "Jita"
+    assert session.kspace["Jita"].band == "H"
+
+
+# -- k-space destinations ----------------------------------------------------
+
+def test_sig_opens_to_kspace_name(session):
+    msg = session.execute("qlm tzvi")
+    assert "opens to Tzvi" in msg and "Devoid" in msg
+    conn = session.chain.root.find_connection("QLM")
+    assert conn is not None and conn.child.name == "Tzvi"
+    assert session.kspace["Tzvi"].band == "L"
+    # Words that chart nothing still label.
+    session.ingest("ZZT-100\tCosmic Signature\tWormhole\t\t20.0%\t1 AU")
+    msg = session.execute("zzt definitely not a system")
+    assert "labelled" in msg
+
+
+def test_here_canonicalizes_kspace_name(session):
+    msg = session.execute("here jita")
+    assert "Jita" in msg
+    assert session.chain.current().name == "Jita"
+    assert session.kspace["Jita"].band == "H"

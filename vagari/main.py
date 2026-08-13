@@ -520,6 +520,8 @@ class MapperApp(App):
         can be asked. One attempt per name per session. True while an
         identification is freshly out; False when it already came back
         empty (a name no chart knows) or recon is off."""
+        if self.session.fill_kspace_from_catalog():
+            self.refresh_all()
         if not self.recon_enabled:
             return False
         names = set(self.session.unresolved_kspace_names())

@@ -15,7 +15,7 @@ from vagari.model.chain import (
 )
 from vagari.model.reconcile import ReconcileReport, apply_despawn, reconcile
 from vagari.model.store import Store
-from vagari.parsers.catalog import lookup_system, lookup_wh_type
+from vagari.parsers.catalog import lookup_kspace, lookup_system, lookup_wh_type
 from vagari.parsers.scanner import parse_scan
 
 _JCODE = re.compile(r"^[Jj]?\d{6}$")
@@ -96,6 +96,22 @@ class Session:
         if not self._pending_trail:
             return None
         return " → ".join(self._pending_trail)
+
+    def fill_kspace_from_catalog(self) -> int:
+        """Resolve named k-space exits from the bundled extract — instant
+        and offline; ESI remains the fallback for names newer than the
+        extract. Returns how many were filled."""
+        from vagari.enrichers.kspace import KSpaceInfo
+
+        filled = 0
+        for name in list(self.unresolved_kspace_names()):
+            hit = lookup_kspace(name)
+            if hit is not None:
+                self.kspace[hit[0]] = KSpaceInfo(hit[1], hit[2], hit[3])
+                filled += 1
+        if filled:
+            self.dirty = True
+        return filled
 
     def orientation_hint(self) -> str | None:
         """The first-session ladder: three hints, each earned by doing the
@@ -668,6 +684,29 @@ class Session:
             "reattached; the record is whole again."
         )
 
+    def _open_kspace(self, prefix: str, kinfo: tuple, at: str | None) -> str:
+        """Open a hole to a charted k-space system — sec and region file
+        instantly from the bundled extract, no network required."""
+        from vagari.enrichers.kspace import KSpaceInfo
+
+        name, system_id, sec, region = kinfo
+        path, system, _sig = self._locate(prefix, at)
+        saved = self.chain.location
+        self.chain.location = list(path)
+        try:
+            self.chain.open_connection(prefix, name)
+        except ChainError:
+            self.chain.location = saved
+            raise
+        self.chain.location = saved
+        self.kspace[name] = KSpaceInfo(system_id, sec, region)
+        self._commit()
+        band = self.kspace[name].band
+        return (
+            f"{prefix.upper()} ({system.name}) opens to {name} — "
+            f"{self.kspace[name].sec_display} {band}-sec, {region}."
+        )
+
     def _switch_chain(self, name: str) -> str:
         self.chain = self.store.load_latest(name) or Chain(name=name)
         self.store.save_active(name)
@@ -692,6 +731,10 @@ class Session:
                     path, system, _sig = self._locate(prefix, at)
                     if system.find_connection(prefix) is None:
                         return self._adopt_fragment(system, path, prefix, ri)
+            # A charted k-space name is a destination, not a label.
+            kinfo = lookup_kspace(arg)
+            if kinfo is not None:
+                return self._open_kspace(prefix, kinfo, at)
         label = " ".join(rest)
         _, system, sig = self._locate(prefix, at)
         sig.label = label
@@ -1252,6 +1295,12 @@ class Session:
         return alerts
 
     def _name_system(self, system, name: str) -> str:
+        hit = lookup_kspace(name)
+        if hit is not None:
+            from vagari.enrichers.kspace import KSpaceInfo
+
+            name = hit[0]  # proper casing from the chart
+            self.kspace[name] = KSpaceInfo(hit[1], hit[2], hit[3])
         system.name = name
         info = lookup_system(name)
         if info is not None:

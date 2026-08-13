@@ -110,6 +110,19 @@ def load_systems() -> dict[str, SystemInfo]:
     return systems
 
 
+_kspace_cache: dict | None = None
+
+
+def lookup_kspace(name: str):
+    """K-space system by name, case-insensitive — (proper name, system id,
+    true sec, region) from the bundled SDE extract, or None."""
+    global _kspace_cache
+    if _kspace_cache is None:
+        _kspace_cache = _data("kspace.json")
+    hit = _kspace_cache.get(name.strip().lower())
+    return tuple(hit) if hit else None
+
+
 def lookup_system(key: str) -> SystemInfo | None:
     """Look up by 'J105443', 'j105443', or bare '105443'."""
     key = key.strip().upper()
