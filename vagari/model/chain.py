@@ -103,6 +103,11 @@ class Connection:
     eol: bool = False
     mass: MassState = MassState.FRESH
     opened_at: datetime = field(default_factory=utcnow)
+    # The in-game info window reading, filed as observed: "day" (at least
+    # another day), "waning" (less than a day), "expired" (closure
+    # imminent). The under-4h reading is the existing eol flag/clock.
+    life_seen: str | None = None
+    life_seen_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -117,6 +122,10 @@ class Connection:
             "eol": self.eol,
             "mass": self.mass.value,
             "opened_at": self.opened_at.isoformat(),
+            "life_seen": self.life_seen,
+            "life_seen_at": (
+                self.life_seen_at.isoformat() if self.life_seen_at else None
+            ),
         }
 
     @classmethod
@@ -136,6 +145,12 @@ class Connection:
                 else None
             ),
             return_prefix=d.get("return_prefix"),
+            life_seen=d.get("life_seen"),
+            life_seen_at=(
+                datetime.fromisoformat(d["life_seen_at"])
+                if d.get("life_seen_at")
+                else None
+            ),
             eol=d["eol"],
             mass=MassState(d["mass"]),
             opened_at=datetime.fromisoformat(d["opened_at"]),

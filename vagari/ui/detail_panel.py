@@ -674,6 +674,36 @@ class DetailPanel(VerticalScroll):
             )
             if conn.eol:
                 lines.append(f"  [bold {DIM}]END OF LIFE[/bold {DIM}]")
+
+            # Click-to-file the in-game info window, both readings.
+            def reading(label: str, cmd: str, active: bool) -> str:
+                if active:
+                    return f"[bold {RUST}]{label}[/bold {RUST}]"
+                return _link(label, f"run_cmd('{cmd}{qualifier}')")
+
+            p = sig.prefix.lower()
+            life_state = "eol" if conn.eol else (conn.life_seen or "")
+            lines.append(
+                f"  [{DIM}]file life:[/{DIM}] "
+                + f" [{DIM}]·[/{DIM}] ".join([
+                    reading(">24h", f"life {p} >24", life_state == "day"),
+                    reading("<24h", f"life {p} <24", life_state == "waning"),
+                    reading("<4h", f"life {p} <4", life_state == "eol"),
+                    reading("imminent", f"life {p} gone",
+                            life_state == "expired"),
+                ])
+            )
+            lines.append(
+                f"  [{DIM}]file mass:[/{DIM}] "
+                + f" [{DIM}]·[/{DIM}] ".join([
+                    reading("fresh", f"mass {p} fresh",
+                            conn.mass.value == "fresh"),
+                    reading("reduced", f"mass {p} reduced",
+                            conn.mass.value == "reduced"),
+                    reading("critical", f"mass {p} critical",
+                            conn.mass.value == "critical"),
+                ])
+            )
             # Far-side intel, on this side of the hole — the whole point is
             # knowing what waits before splashing it.
             far = conn.child.name if conn.child.name else "?"

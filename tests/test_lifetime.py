@@ -55,3 +55,33 @@ def test_hours_text():
     assert hours_text(0.2) == "12m"
     assert hours_text(7.51) == "7h31m"
     assert hours_text(24) == "24h00m"
+
+
+# -- in-game readings ---------------------------------------------------------
+
+def test_life_readings_govern_assessment():
+    from datetime import timedelta
+
+    from vagari.model.chain import Connection, System, utcnow
+    from vagari.model.lifetime import LifeStatus, assess
+
+    conn = Connection(sig_prefix="QCZ", child=System(name="?"), wh_type="W237")
+    # "at least another day" read 2h ago: book may not undercut it.
+    conn.opened_at = utcnow() - timedelta(hours=23)
+    conn.life_seen, conn.life_seen_at = "day", utcnow() - timedelta(hours=2)
+    life = assess(conn)
+    assert life.remaining_hours >= 21.9
+    # "less than a day" read 20h ago: under 4h now → waning.
+    conn.life_seen, conn.life_seen_at = "waning", utcnow() - timedelta(hours=20)
+    conn.opened_at = utcnow()
+    life = assess(conn)
+    assert life.status is LifeStatus.WANING and life.remaining_hours <= 4.01
+    # closure imminent → expired, zero.
+    conn.life_seen = "expired"
+    life = assess(conn)
+    assert life.status is LifeStatus.EXPIRED and life.remaining_hours == 0.0
+    # untyped K162 with a waning reading still gets bounds.
+    k = Connection(sig_prefix="INA", child=System(name="?"))
+    k.life_seen, k.life_seen_at = "waning", utcnow() - timedelta(hours=1)
+    life = assess(k)
+    assert life.total_hours is None and 22.9 < life.remaining_hours <= 23.01

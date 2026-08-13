@@ -264,8 +264,11 @@ class Session:
                                 sig_only=head.startswith("del"))
         if head == "eol" and rest:
             return self._eol(rest[0], at)
-        if head == "crit" and rest:
-            return self._mass(rest[0], at)
+        if head in ("crit", "mass") and rest:
+            return self._mass(rest[0], at,
+                              rest[1] if len(rest) > 1 else None)
+        if head == "life" and len(rest) >= 2:
+            return self._set_life(rest[0], rest[1], at)
         if head == "return" and rest:
             return self._set_return(
                 rest[0], at, rest[1] if len(rest) > 1 else None
@@ -359,8 +362,15 @@ class Session:
         return path, system, system.find_sig(p)
 
     def _connection_of(self, prefix: str, at: str | None):
-        path, system, _sig = self._locate(prefix, at)
+        path, system, sig = self._locate(prefix, at)
         conn = system.find_connection(prefix)
+        if conn is None and len(path) > 1:
+            # The paired return IS the inbound hole — one wormhole, two
+            # sigs; clock, mass, and readings are shared.
+            parent = self.chain.system_at(path[:-1])
+            via = parent.find_connection(path[-1])
+            if via is not None and via.return_prefix == sig.prefix:
+                return system, via
         if conn is None:
             raise ChainError(
                 f"{prefix.upper()[:3]} in {system.name} is not an opened wormhole"
@@ -371,14 +381,68 @@ class Session:
         system, conn = self._connection_of(prefix, at)
         conn.eol = not conn.eol
         conn.eol_marked_at = utcnow() if conn.eol else None
+        if conn.eol:
+            conn.life_seen = None  # the <4h reading supersedes older ones
+            conn.life_seen_at = None
         self._commit()
         state = "END OF LIFE (≤4h from now)" if conn.eol else "no longer EOL"
         return f"{conn.sig_prefix} ({system.name}) marked {state}."
 
-    def _mass(self, prefix: str, at: str | None = None) -> str:
+    _LIFE_WORDS = {
+        ">24": "day", "24+": "day", "day": "day",
+        "<24": "waning", "24-": "waning", "waning": "waning",
+        "<4": "eol", "4-": "eol", "eol": "eol",
+        "gone": "expired", "expired": "expired", "imminent": "expired",
+    }
+
+    def _set_life(self, prefix: str, word: str, at: str | None = None) -> str:
+        """File the in-game info-window lifetime reading, as observed."""
+        state = self._LIFE_WORDS.get(word.lower())
+        if state is None:
+            raise ChainError(
+                f"lifetime reads: >24 · <24 · <4 · gone (not {word!r})"
+            )
         system, conn = self._connection_of(prefix, at)
-        cycle = [MassState.FRESH, MassState.REDUCED, MassState.CRITICAL]
-        conn.mass = cycle[(cycle.index(conn.mass) + 1) % 3]
+        if state == "eol":
+            if not conn.eol:
+                conn.eol = True
+                conn.eol_marked_at = utcnow()
+            conn.life_seen = None
+            conn.life_seen_at = None
+            note = "under 4 hours — the clock runs from now"
+        else:
+            conn.eol = False
+            conn.eol_marked_at = None
+            conn.life_seen = state
+            conn.life_seen_at = utcnow()
+            note = {
+                "day": "at least another day on it",
+                "waning": "less than a day left",
+                "expired": "closure imminent — verify and cull",
+            }[state]
+        self._commit()
+        return f"{conn.sig_prefix} ({system.name}) lifetime filed: {note}."
+
+    _MASS_WORDS = {
+        "fresh": MassState.FRESH, "ok": MassState.FRESH,
+        "reduced": MassState.REDUCED, "half": MassState.REDUCED,
+        "critical": MassState.CRITICAL, "crit": MassState.CRITICAL,
+        "verge": MassState.CRITICAL,
+    }
+
+    def _mass(self, prefix: str, at: str | None = None,
+              word: str | None = None) -> str:
+        system, conn = self._connection_of(prefix, at)
+        if word is not None:
+            state = self._MASS_WORDS.get(word.lower())
+            if state is None:
+                raise ChainError(
+                    f"mass reads: fresh · reduced · critical (not {word!r})"
+                )
+            conn.mass = state
+        else:
+            cycle = [MassState.FRESH, MassState.REDUCED, MassState.CRITICAL]
+            conn.mass = cycle[(cycle.index(conn.mass) + 1) % 3]
         self._commit()
         return f"{conn.sig_prefix} ({system.name}) mass: {conn.mass.value.upper()}."
 

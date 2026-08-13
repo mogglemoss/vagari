@@ -637,3 +637,27 @@ def test_typing_the_paired_return_types_the_inbound_hole(tmp_path):
     assert inbound.wh_type == "B274"
     assert inbound.k162_end == "parent"       # true type read on this side
     assert s.chain.current().find_connection("INA") is None
+
+
+def test_life_and_mass_grammar_file_readings(tmp_path):
+    s = _arrived_session(tmp_path)
+    s.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
+    inbound = s.chain.root.find_connection("XPA")
+
+    msg = s.execute("life xpa <24")
+    assert "less than a day" in msg
+    assert inbound.life_seen == "waning" and not inbound.eol
+
+    msg = s.execute("life ina <4")     # via the paired return: same hole
+    assert "under 4 hours" in msg
+    assert inbound.eol and inbound.life_seen is None
+
+    s.execute("life xpa >24")
+    assert inbound.life_seen == "day" and not inbound.eol
+
+    assert "REFUSED" in s.execute("life xpa someday")
+
+    s.execute("mass ina critical")     # shared mass, filed from the far side
+    assert inbound.mass.value == "critical"
+    s.execute("crit xpa fresh")
+    assert inbound.mass.value == "fresh"
