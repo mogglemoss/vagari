@@ -226,7 +226,10 @@ class MapperApp(App):
             self.set_timer(2.0, lambda: tree.remove_class("alerting"))
         node = self.query_one(ChainTree).cursor_node
         self.query_one(DetailPanel).show_node(node.data if node else None)
-        self.status(f"Reconnaissance filed: activity for {len(activity)} systems.")
+        self.status(
+            f"Reconnaissance filed — one sweep of the cluster, "
+            f"{len(activity)} systems reporting activity."
+        )
 
     # -- refresh -------------------------------------------------------------
 
