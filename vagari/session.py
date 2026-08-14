@@ -871,18 +871,27 @@ class Session:
         """Refile what a signature IS — eyeballed on grid before the scan
         resolves it, or correcting a mistaken paste."""
         _, system, sig = self._locate(prefix, at)
-        if (
-            sig.group is SigGroup.WORMHOLE
-            and kind is not SigGroup.WORMHOLE
-            and system.find_connection(sig.prefix) is not None
-        ):
-            raise ChainError(
-                f"{sig.prefix} is an opened wormhole — strike or sever it "
-                f"before refiling its kind"
+        retracted = ""
+        conn = (
+            system.find_connection(sig.prefix)
+            if sig.group is SigGroup.WORMHOLE and kind is not SigGroup.WORMHOLE
+            else None
+        )
+        if conn is not None:
+            unexplored = conn.child.name.startswith("?") and not (
+                conn.child.sigs or conn.child.connections
             )
+            if not unexplored:
+                raise ChainError(
+                    f"{sig.prefix} is an opened wormhole with "
+                    f"{conn.child.name} behind it — strike or sever it "
+                    f"before refiling its kind"
+                )
+            system.connections.remove(conn)
+            retracted = " The unexplored passage is retracted."
         sig.group = kind
         self._commit()
-        return f"{sig.prefix} ({system.name}) refiled: {kind.value}."
+        return f"{sig.prefix} ({system.name}) refiled: {kind.value}.{retracted}"
 
     def _open_at(self, system: System, prefix: str, dest: str, *,
                  jclass=None, statics=None, effect=None, wh_type=None) -> Connection:
@@ -1350,14 +1359,25 @@ class Session:
                     f"{new_prefix} is filed as a {target.group.value}, not a "
                     "wormhole — check the prefix"
                 )
-            here.sigs.remove(sig)
+            placeholder = sig.sig_id.endswith("-000") or sig.label in (
+                "K162 (unscanned)", "hole (unscanned)"
+            )
             target.group = SigGroup.WORMHOLE
+            if placeholder:
+                here.sigs.remove(sig)
+                message = (
+                    f"{old_prefix} absorbed into {new_prefix} — the "
+                    "placeholder is struck, the connection stands."
+                )
+            else:
+                # A real scanned sig was mis-picked: the connection moves,
+                # but the signature still exists in space — keep it.
+                message = (
+                    f"Connection refiled {old_prefix} → {new_prefix}; "
+                    f"{old_prefix} remains on record, unopened."
+                )
             if sig.label and sig.label not in ("K162 (unscanned)", "hole (unscanned)"):
                 target.label = target.label or sig.label
-            message = (
-                f"{old_prefix} absorbed into {new_prefix} — the placeholder "
-                "is struck, the connection stands."
-            )
         else:
             sig.sig_id = f"{new_prefix}-000"
             if sig.label in ("K162 (unscanned)", "hole (unscanned)"):

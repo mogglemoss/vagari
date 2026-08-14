@@ -41,7 +41,7 @@ Every deposit also reports which signatures have despawned; press `s` (or submit
 
 **The map follows you.** VAGARI tails your EVE chat logs (locally; Fenris Creations writes them precisely so tools may read them — enable "Log chat to file" in EVE's settings) and moves `◉ YOU` as you jump — down through mapped holes, back up, or to wherever in the chain you have turned out to be. Multiboxing is understood: every client's log is watched, each tagged with its pilot, and the Bureau follows the first pilot who actually jumps — the one being flown, not the one spamming Jita local. `pilot` reports the roster; `pilot <name>` locks to a character (`VAGARI_PILOT` env for a standing order); `pilot off` releases. Arrive somewhere unmapped and the Bureau files it on the spot — every working mapper does, because the map following reality is the point. If exactly one scanned passage fits, the arrival files through it, destination class, statics, and weather already annotated; when the passage is uncertain the system files through a placeholder sig with the candidates named (`zaa = abc` refiles it). Jump casually for an hour without touching VAGARI and the chain builds itself behind you; backtrack homeward pasting each system's sigs (EVE remembers them for the session) and a scan revealing exactly one new wormhole absorbs the placeholder automatically. The first scan you deposit in a fresh system pairs its lone wormhole as your return hole automatically — it is the first thing a pilot scans — with `return <sig>` to restate it; two holes in that first scan and the Bureau declines to guess. On a fresh chain, the first system you visit names your root — setup is "start the instrument, undock."
 
-**Wormholes carry countdowns.** Type a hole (`abc H296`) and it knows its target class, mass, size, and book lifetime. The tree shows an upper-bound countdown — `≤13h04m` — amber when waning, and `EXPIRED?` when the paperwork has outlived the physics. Mark end-of-life in one key and the four-hour clock runs from that moment — two hours later the badge honestly reads `≤2h`. The bound is honest: it counts from when *you* first mapped the hole, which is the only fact the Bureau actually possesses.
+**Wormholes carry countdowns.** Type a hole (`abc H296`) and it knows its target class, mass, size, and book lifetime. The tree shows an upper-bound countdown — `≤13h04m` — amber when waning, and `EXPIRED?` when the paperwork has outlived the physics. Mark end-of-life in one key and the four-hour clock runs from that moment — two hours later the badge honestly reads `≤2h`. Better still, file the info window's own readings and the record takes them verbatim: `life abc <24 · <4 · <1 · gone` and `mass abc >50 · <50 · <10`, from either end of the hole, or by clicking the reading rows in the dossier. The bound stays honest: absent a reading it counts from when *you* first mapped the hole, which is the only fact the Bureau actually possesses.
 
 **The chain watches with you.** Fleetmates' positions appear as `◎ Name` markers wherever their clients are logged in (from the same chatlogs follow-me reads); systems whose scans have gone stale say so (`scanned 9h ago`); and the watchtower flares the mascot and names any chain system that turns hostile between recon sweeps. THE BUREAU IS MERELY NOTING. LOUDLY.
 
@@ -93,7 +93,7 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 
 ---
 
-**Keyboard and mouse are equals.** Arrows or clicks move the highlight and the dossier panel follows live; a single click only selects — double-click (or Enter) proceeds through a hole. The dossier's `nav · eol · mass · flag · strike · return` links act on whatever is selected, so the panel is a permanently-open context menu. The submission line offers ghost-text completions (type codes, commands, pilot names) — → accepts. `home` prints the route back to the top, door by door, using return-side sigs where they are on file.
+**Keyboard and mouse are equals.** Arrows or clicks move the highlight and the dossier panel follows live; a single click only selects — double-click (or Enter) proceeds through a hole. The dossier's `nav · eol · mass · flag · strike · return` links act on whatever is selected, so the panel is a permanently-open context menu. The submission line offers ghost-text completions (commands, type codes, pilot names, and system names — the chain first, then the full k-space chart) — → accepts. `home` prints the route back to the top, door by door, using return-side sigs where they are on file.
 
 ## The Grammar
 
@@ -103,9 +103,10 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `sweep` / `cull` | batch strikes: reported despawns · holes past book lifetime |
 | `nav abc` | proceed through wormhole ABC |
 | `up` / `top` | return toward / to the root |
-| `abc J105443` | open ABC to a catalogued system (class, statics, weather) |
+| `abc J105443` / `abc Tzvi` | open ABC to a system — J-space or the k-space chart (sec and region filed offline) |
 | `abc H296` | type wormhole ABC (target class, lifetime, mass) |
-| `abc <words>` | label a signature |
+| `abc gas` | refile a sig's kind — wormhole · combat · data · relic · gas · ore |
+| `abc <words>` | label a signature (quote a reserved word: `abc "gas"`) |
 | `return abc [TYPE]` | pair ABC with its system's inbound hole (+true type read there) |
 | `sever abc` | the opposite of strike: cut the hole, KEEP the far side adrift |
 | `fragment [name]` | file a disconnected fragment (or a pending arrival) |
@@ -115,7 +116,9 @@ If no logs are found, follow-me simply stays off and the instrument works as a m
 | `here <name>` | name the current system |
 | `flag abc` / `strike abc` | flag · strike a sig (mapped content asks y/n; `del`/`discard` accepted) |
 | `eol abc` / `crit abc` | toggle end-of-life · cycle mass state |
-| `k162 [abc]` · `k abc` | file a pending arrival through the hole you took |
+| `life abc >24 · <24 · <4 · <1 · gone` | file the in-game lifetime reading as observed |
+| `mass abc >50 · <50 · <10` | file the in-game mass reading directly |
+| `k162` | hand-file a queued arrival (arrivals normally file themselves) |
 | `chain <name>` | switch chain of custody |
 | `pilot [name\|off]` | who follow-me follows (multibox); default: first to jump |
 | `recon` | refresh system activity from ESI |

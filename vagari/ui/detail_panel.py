@@ -561,17 +561,27 @@ class DetailPanel(VerticalScroll):
             if clouds:
                 contents = " · ".join(f"{c.units:,} × {c.gas}" for c in clouds)
                 lines.append(f"  [{TEXT}]{contents}[/{TEXT}]")
-        if sig.group is SigGroup.UNKNOWN:
-            kinds = " ".join(
-                f"[{DIM}]·[/{DIM}] " + _link(
-                    word, f"run_cmd('{sig.prefix.lower()} {word}{qualifier}')"
-                )
-                for word in ("wormhole", "combat", "data", "relic", "gas", "ore")
-            ).removeprefix(f"[{DIM}]·[/{DIM}] ")
+        explored = conn is not None and not (
+            conn.child.name.startswith("?")
+            and not (conn.child.sigs or conn.child.connections)
+        )
+        if not explored:
+            # Kinds stay re-fileable until a hole has something behind it —
+            # a mis-click must never lock the record.
+            current_kind = sig.group.value.split()[0].lower()
+            cells = []
+            for word in ("wormhole", "combat", "data", "relic", "gas", "ore"):
+                if word == current_kind:
+                    cells.append(f"[bold {RUST}]{word}[/bold {RUST}]")
+                else:
+                    cells.append(_link(
+                        word,
+                        f"run_cmd('{sig.prefix.lower()} {word}{qualifier}')"
+                    ))
             lines += [
                 "",
-                _rule("NATURE, IF EYEBALLED"),
-                f"  {kinds}",
+                _rule("NATURE, AS FILED"),
+                "  " + f" [{DIM}]·[/{DIM}] ".join(cells),
             ]
         from vagari.parsers.catalog import candidate_types
 

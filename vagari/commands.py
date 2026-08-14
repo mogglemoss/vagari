@@ -77,8 +77,9 @@ REGISTRY: list[Command] = [
     Command("crit", "crit abc [>50 · <50 · <10]", "cycle mass — or file "
             "the in-game reading directly", "record", keys="m",
             aliases=("mass",)),
-    Command("rekey", "zaa = abc", "refile a placeholder under its real sig",
-            "record"),
+    Command("rekey", "zaa = abc", "refile a hole under its real sig — "
+            "moves the connection; a mis-picked real sig survives, "
+            "unopened", "record"),
     Command("cull", "cull", "strike every hole past its book lifetime "
             "(children sever)", "record", palette="Cull expired",
             action="cull"),

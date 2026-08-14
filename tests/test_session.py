@@ -237,3 +237,40 @@ def test_quoted_label_beats_reserved_words(session):
     assert "labelled 'gas'" in msg
     sig = session.chain.root.find_sig("ASD")
     assert sig.label == "gas" and sig.group is SigGroup.UNKNOWN
+
+
+def test_wrong_wormhole_sig_reselects_and_survives(session):
+    """Typed and opened the wrong sig: `abc = def` moves the connection;
+    the mis-picked real sig stays on record, unopened."""
+    session.ingest(
+        "ABC-100\tCosmic Signature\tWormhole\t\t40.0%\t1 AU\n"
+        "DEF-200\tCosmic Signature\tWormhole\t\t30.0%\t1 AU"
+    )
+    session.execute("abc H296")
+    session.execute("abc J154535")
+    msg = session.execute("abc = def")
+    assert "refiled ABC → DEF" in msg and "remains on record" in msg
+    root = session.chain.root
+    assert root.find_connection("ABC") is None
+    assert root.find_sig("ABC") is not None          # still a real sig
+    conn = root.find_connection("DEF")
+    assert conn.child.name == "J154535" and conn.wh_type == "H296"
+
+
+def test_kind_change_retracts_unexplored_hole(session):
+    """Mis-filed a relic as a wormhole and typed it: refiling the kind
+    retracts the unexplored passage instead of locking the mistake in."""
+    session.ingest("ABC-100\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
+    session.execute("abc H296")     # conn to "?" — never jumped
+    msg = session.execute("abc relic")
+    assert "refiled: Relic Site" in msg and "retracted" in msg
+    root = session.chain.root
+    assert root.find_connection("ABC") is None
+    assert root.find_sig("ABC").group is SigGroup.RELIC
+    # But an explored hole still refuses.
+    session.ingest("GHI-300\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
+    session.execute("ghi J154535")
+    session.follow("J154535")
+    session.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
+    session.execute("up")
+    assert "REFUSED" in session.execute("ghi gas")
