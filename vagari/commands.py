@@ -51,8 +51,8 @@ REGISTRY: list[Command] = [
             action="show_homeward", aliases=("route",)),
     Command("", "y", "cursor to ◉ YOU", "navigation", keys="y"),
     # the record
-    Command("", "abc J105443", "open ABC to a catalogued system (a fragment's "
-            "name adopts it)", "record"),
+    Command("", "abc J105443", "open ABC to a system — J-code or k-space "
+            "name (abc tzvi); a fragment's name adopts it", "record"),
     Command("", "abc H296", "type wormhole ABC — class, lifetime, mass",
             "record"),
     Command("", "abc <words>", "label a signature (quote a reserved "

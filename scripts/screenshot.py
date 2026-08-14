@@ -40,19 +40,19 @@ def build_session(tmp: Path) -> Session:
         "RRB-300\tCosmic Signature\t\t\t34.2%\t19.0 AU\n"
     )
     session.execute("kwv K162")
+    session.execute("life kwv <24")   # the in-game reading, filed verbatim
+    session.execute("rrb gas")        # kind, eyeballed before the scan
 
-    # Backdate the N110 so the lifetime countdown shows a waning hole,
-    # and file some reconnaissance so the detail panel has activity data.
+    # Backdate the root's QLM so the lifetime countdown shows a waning
+    # hole, and file some reconnaissance for the detail panel.
     from datetime import timedelta
 
     from vagari.enrichers.activity import SystemActivity
     from vagari.parsers.catalog import lookup_system
 
     session.chain.top()
-    session.execute("nav qlm")
-    n110 = session.chain.current().find_connection("QLM")
-    n110.opened_at -= timedelta(hours=21, minutes=30)
-    session.chain.top()
+    qlm = session.chain.current().find_connection("QLM")
+    qlm.opened_at -= timedelta(hours=21, minutes=30)
     session.activity = {
         lookup_system("J164417").system_id: SystemActivity(3, 1, 12),
         lookup_system("J154535").system_id: SystemActivity(0, 0, 44),

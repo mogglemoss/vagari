@@ -581,7 +581,7 @@ class DetailPanel(VerticalScroll):
                     ))
             lines += [
                 "",
-                _rule("NATURE, AS FILED"),
+                _rule("KIND"),
                 "  " + f" [{DIM}]·[/{DIM}] ".join(cells),
             ]
         from vagari.parsers.catalog import candidate_types
