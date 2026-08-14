@@ -214,3 +214,26 @@ def test_here_canonicalizes_kspace_name(session):
     assert "Jita" in msg
     assert session.chain.current().name == "Jita"
     assert session.kspace["Jita"].band == "H"
+
+
+# -- kind refiling ------------------------------------------------------------
+
+def test_kind_words_refile_a_sig(session):
+    session.ingest("ASD-123\tCosmic Signature\t\t\t2.5%\t4 AU")
+    msg = session.execute("asd gas")
+    assert "refiled: Gas Site" in msg
+    assert session.chain.root.find_sig("ASD").group is SigGroup.GAS
+    session.execute("asd relic")
+    assert session.chain.root.find_sig("ASD").group is SigGroup.RELIC
+    # An opened wormhole's kind is structural — refuse.
+    session.ingest("QLM-802\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
+    session.execute("qlm J154535")
+    assert "REFUSED" in session.execute("qlm gas")
+
+
+def test_quoted_label_beats_reserved_words(session):
+    session.ingest("ASD-123\tCosmic Signature\t\t\t2.5%\t4 AU")
+    msg = session.execute("asd \"gas\"")
+    assert "labelled 'gas'" in msg
+    sig = session.chain.root.find_sig("ASD")
+    assert sig.label == "gas" and sig.group is SigGroup.UNKNOWN

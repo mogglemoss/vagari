@@ -55,7 +55,10 @@ REGISTRY: list[Command] = [
             "name adopts it)", "record"),
     Command("", "abc H296", "type wormhole ABC — class, lifetime, mass",
             "record"),
-    Command("", "abc <words>", "label a signature", "record"),
+    Command("", "abc <words>", "label a signature (quote a reserved "
+            "word: abc \u2018gas\u2019)", "record"),
+    Command("", "abc gas", "refile a sig's kind — wormhole · combat · "
+            "data · relic · gas · ore", "record"),
     Command("return", "return abc [B274]", "abc is the way home; optional "
             "type read from this side (re-pair to correct; return! unpairs)",
             "record", aliases=("return!",)),

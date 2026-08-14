@@ -465,15 +465,15 @@ class DetailPanel(VerticalScroll):
             if system.name and not system.name.startswith("?")
             else ""
         )
+        form_label = f"FILE AGAINST {sig.prefix}"
         if sig.group is SigGroup.WORMHOLE and conn is not None and conn.wh_type:
-            form_label = f"FILE AGAINST {sig.prefix}"
             hint = "words label it · a new code retypes it"
         elif sig.group is SigGroup.WORMHOLE:
-            form_label = f"FILE AGAINST {sig.prefix}"
             hint = "H296 types it · J105443 opens it · words label it"
+        elif sig.group is SigGroup.UNKNOWN:
+            hint = "gas·relic·data sets its kind · H296 · J105443 · words label it"
         else:
-            form_label = f"FILE AGAINST {sig.prefix}"
-            hint = "words label it — filed verbatim"
+            hint = "words label it · gas/relic/data refiles its kind"
         self._arm_form(sig.prefix.lower(), qualifier, hint, label=form_label)
         self._extras(show_eol, False, False, form=True)
 
@@ -561,6 +561,18 @@ class DetailPanel(VerticalScroll):
             if clouds:
                 contents = " · ".join(f"{c.units:,} × {c.gas}" for c in clouds)
                 lines.append(f"  [{TEXT}]{contents}[/{TEXT}]")
+        if sig.group is SigGroup.UNKNOWN:
+            kinds = " ".join(
+                f"[{DIM}]·[/{DIM}] " + _link(
+                    word, f"run_cmd('{sig.prefix.lower()} {word}{qualifier}')"
+                )
+                for word in ("wormhole", "combat", "data", "relic", "gas", "ore")
+            ).removeprefix(f"[{DIM}]·[/{DIM}] ")
+            lines += [
+                "",
+                _rule("NATURE, IF EYEBALLED"),
+                f"  {kinds}",
+            ]
         from vagari.parsers.catalog import candidate_types
 
         # A paired return's designation reads from the parent's side — the

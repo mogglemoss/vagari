@@ -845,11 +845,44 @@ class Session:
             kinfo = lookup_kspace(arg)
             if kinfo is not None:
                 return self._open_kspace(prefix, kinfo, at)
+            # A kind word refiles the signature's nature.
+            kind = self._KIND_WORDS.get(arg.lower())
+            if kind is not None:
+                return self._set_kind(prefix, kind, at)
         label = " ".join(rest)
+        # Quotes force a label — the escape hatch when the label IS a
+        # reserved word ("gas", a type code, a system name).
+        if len(label) >= 2 and label[0] == label[-1] and label[0] in "\"'“”":
+            label = label.strip("\"'“”")
         _, system, sig = self._locate(prefix, at)
         sig.label = label
         self._commit()
         return f"{sig.prefix} ({system.name}) labelled {label!r}."
+
+    _KIND_WORDS = {
+        "wormhole": SigGroup.WORMHOLE, "wh": SigGroup.WORMHOLE,
+        "combat": SigGroup.COMBAT, "data": SigGroup.DATA,
+        "relic": SigGroup.RELIC, "gas": SigGroup.GAS,
+        "ore": SigGroup.ORE, "unknown": SigGroup.UNKNOWN,
+    }
+
+    def _set_kind(self, prefix: str, kind: SigGroup,
+                  at: str | None = None) -> str:
+        """Refile what a signature IS — eyeballed on grid before the scan
+        resolves it, or correcting a mistaken paste."""
+        _, system, sig = self._locate(prefix, at)
+        if (
+            sig.group is SigGroup.WORMHOLE
+            and kind is not SigGroup.WORMHOLE
+            and system.find_connection(sig.prefix) is not None
+        ):
+            raise ChainError(
+                f"{sig.prefix} is an opened wormhole — strike or sever it "
+                f"before refiling its kind"
+            )
+        sig.group = kind
+        self._commit()
+        return f"{sig.prefix} ({system.name}) refiled: {kind.value}."
 
     def _open_at(self, system: System, prefix: str, dest: str, *,
                  jclass=None, statics=None, effect=None, wh_type=None) -> Connection:
