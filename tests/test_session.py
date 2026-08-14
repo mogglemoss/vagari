@@ -274,3 +274,10 @@ def test_kind_change_retracts_unexplored_hole(session):
     session.ingest("INA-006\tCosmic Signature\tWormhole\t\t6.0%\t1 AU")
     session.execute("up")
     assert "REFUSED" in session.execute("ghi gas")
+
+
+def test_kind_returns_to_unknown(session):
+    session.ingest("ASD-123\tCosmic Signature\tRelic Site\t\t50.0%\t1 AU")
+    msg = session.execute("asd unknown")
+    assert "refiled: Unknown" in msg
+    assert session.chain.root.find_sig("ASD").group is SigGroup.UNKNOWN

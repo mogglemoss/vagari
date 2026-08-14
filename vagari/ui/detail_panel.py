@@ -570,7 +570,8 @@ class DetailPanel(VerticalScroll):
             # a mis-click must never lock the record.
             current_kind = sig.group.value.split()[0].lower()
             cells = []
-            for word in ("wormhole", "combat", "data", "relic", "gas", "ore"):
+            for word in ("wormhole", "combat", "data", "relic", "gas",
+                         "ore", "unknown"):
                 if word == current_kind:
                     cells.append(f"[bold {RUST}]{word}[/bold {RUST}]")
                 else:
