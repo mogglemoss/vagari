@@ -72,10 +72,14 @@ def test_life_readings_govern_assessment():
     life = assess(conn)
     assert life.remaining_hours >= 21.9
     # "less than a day" read 20h ago: under 4h now → waning.
-    conn.life_seen, conn.life_seen_at = "waning", utcnow() - timedelta(hours=20)
+    conn.life_seen, conn.life_seen_at = "waning", utcnow() - timedelta(
+        hours=20, minutes=6
+    )
     conn.opened_at = utcnow()
     life = assess(conn)
-    assert life.status is LifeStatus.WANING and life.remaining_hours <= 4.01
+    # 3.9h left — clear of the 4h boundary, which Windows' coarse clock
+    # can land on exactly (24-20 = 4.0 is not < 4.0).
+    assert life.status is LifeStatus.WANING and life.remaining_hours <= 3.91
     # closure imminent → expired, zero.
     conn.life_seen = "expired"
     life = assess(conn)
