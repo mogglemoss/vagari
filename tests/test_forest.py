@@ -55,14 +55,11 @@ def test_sweep_severs_despawned_hole_with_children(session):
     assert session.chain.roots[1].name == "J154535"
 
 
-def test_fragment_files_pending_arrival(session):
-    session.follow("J100744")               # unmapped arrival
-    msg = session.execute("fragment")
-    assert "fragment #2" in msg
-    assert session.chain.location == [1]
+def test_arrival_never_lingers_for_fragment(session):
+    session.follow("J100744")               # files itself on arrival
+    assert session.pending_arrival is None
     assert session.chain.current().name == "J100744"
     assert session.chain.current().jclass == "C1"  # catalog-enriched
-    assert session.pending_arrival is None
 
 
 def test_fragment_by_name(session):

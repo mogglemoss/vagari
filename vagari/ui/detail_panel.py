@@ -337,18 +337,6 @@ class DetailPanel(VerticalScroll):
                 )
         if actions:
             head.append(f"[{DIM}]·[/{DIM}]".join(f" {a} " for a in actions))
-        pending = self.session.pending_arrival
-        if pending is not None and path is not None and list(path) == list(pending[1]):
-            links = [
-                _link(c, f"run_cmd('k162 {c}')", TEXT)
-                for c in self.session.arrival_candidates()
-            ]
-            links.append(_link("a fresh hole", "run_cmd('k162!')"))
-            head.append(
-                f"[bold {WARN}]ARRIVAL UNFILED: {pending[0]}[/bold {WARN}] "
-                f"[{MUTED}]— through:[/{MUTED}]"
-                + f"[{DIM}]·[/{DIM}]".join(f" {l} " for l in links)
-            )
         # Identity: class, statics, region — one tidy block.
         info = lookup_system(system.name)
         if system.jclass:

@@ -436,33 +436,6 @@ async def test_tick_relabels_in_place(tmp_path):
         assert list(node_before.label.spans) != spans_before
 
 
-@pytest.mark.asyncio
-async def test_arrival_choice_in_dossier(tmp_path):
-    """An ambiguous arrival puts the passage choice in ◉ YOU's dossier as
-    click targets; picking one files the system through that hole."""
-    app = make_app(tmp_path)
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        app.session.ingest("XPA-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
-        app.session.ingest("UNB-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
-        msg = app.session.follow("J154535")
-        assert "which passage" in msg
-        app.refresh_all()
-        await pilot.pause()
-        panel = app.query_one(DetailPanel)
-        panel.show_node(("system", [0]))
-        text = str(panel.content)
-        assert "ARRIVAL UNFILED: J154535" in text
-        assert "run_cmd('k162 XPA')" in text and "run_cmd('k162 UNB')" in text
-        assert "run_cmd('k162!')" in text
-
-        app.action_run_cmd("k162 XPA")
-        await pilot.pause()
-        assert app.session.pending_arrival is None
-        conn = app.session.chain.root.find_connection("XPA")
-        assert conn is not None and conn.child.name == "J154535"
-        assert "ARRIVAL UNFILED" not in str(panel.content)
-
 
 @pytest.mark.asyncio
 async def test_pairing_correctable_from_both_dossiers(tmp_path):

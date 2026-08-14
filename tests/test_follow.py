@@ -175,17 +175,11 @@ def test_ambiguous_prefix_needs_qualifier(tmp_path):
     assert not sess.chain.root.find_sig("AAB").flagged
 
 
-def test_follow_unmapped_offers_k162(session):
+def test_follow_unmapped_files_on_arrival(session):
+    """The map follows you: an unscanned jump files itself, placeholder
+    and all — no keypress, no stale marker."""
     msg = session.follow("J100744")
-    assert "UNMAPPED" in msg and "k162" in msg.lower()
-    assert session.pending_arrival == ("J100744", [0])
-    assert session.chain.location == [0]  # marker does not move on speculation
-
-
-def test_file_k162_creates_placeholder(session):
-    session.follow("J100744")
-    msg = session.file_k162()
-    assert "ZAA" in msg
+    assert "FILED ON ARRIVAL" in msg and "ZAA" in msg
     origin = session.chain.root
     sig = origin.find_sig("ZAA")
     assert sig.group is SigGroup.WORMHOLE
@@ -374,16 +368,16 @@ def test_pilot_lock_survives_restart(tmp_path):
     assert third.pilot_lock is None
 
 
-def test_unmapped_arrival_is_sticky_in_header(tmp_path):
-    # UI-level: the pending arrival badge lives in the header, not just the
-    # transient status line that auto-recon overwrites.
+def test_arrival_files_itself_no_badge_needed(tmp_path):
+    # UI-level: arrivals file on the spot, so no UNMAPPED badge lingers —
+    # the map simply has the system, enriched from the k-space chart.
     import asyncio
 
     from textual.widgets import Static
 
     from vagari.main import MapperApp
 
-    async def run() -> str:
+    async def run():
         sess = Session.open(Store(base_dir=tmp_path / "state"))
         sess.chain.root.name = "J103529"
         app = MapperApp(session=sess, recon=False, follow=False)
@@ -391,10 +385,14 @@ def test_unmapped_arrival_is_sticky_in_header(tmp_path):
             sess.follow_event("Cormorant Fell", "Vard", initial=False)
             app.refresh_all()
             await pilot.pause()
-            return str(app.query_one("#header-status", Static).content)
+            return (
+                str(app.query_one("#header-status", Static).content),
+                sess.chain.current().name,
+            )
 
-    header = asyncio.run(run())
-    assert "UNMAPPED: Vard" in header and "press k" in header
+    header, current = asyncio.run(run())
+    assert "UNMAPPED" not in header
+    assert current == "Vard"
 
 
 def test_cold_start_shows_not_following_hint(tmp_path):
@@ -444,25 +442,20 @@ def test_arrival_files_itself_through_sole_scanned_hole(tmp_path):
     assert s.chain.root.find_sig("ZAA") is None
 
 
-def test_k_ambiguous_asks_then_files_by_name(tmp_path):
+def test_ambiguous_arrival_files_placeholder_with_hint(tmp_path):
+    """Two candidate holes: the arrival still files — topology is certain
+    even when the passage is not — via a placeholder, with the rekey
+    hint naming the candidates."""
     s = _session_with_holes(tmp_path, holes=2)
     msg = s.follow("J154535")
-    assert "which passage" in msg and s.pending_arrival is not None
-    msg = s.file_k162()
-    assert "which passage" in msg
-    assert s.pending_arrival is not None  # nothing mutated
-    msg = s.file_k162("xpa")  # case-insensitive pick
-    assert "through XPA" in msg
-    assert s.chain.location == [0, "XPA"]
-
-
-def test_k_bang_forces_fresh_hole(tmp_path):
-    s = _session_with_holes(tmp_path, holes=2)
-    s.follow("J154535")
-    msg = s.execute("k162!")
-    assert "placeholder ZAA" in msg
-    assert s.chain.root.find_sig("ZAA") is not None
+    assert "FILED ON ARRIVAL" in msg and "ZAA" in msg
+    assert "XPA" in msg and "`zaa = xpa` refiles" in msg.lower()
     assert s.chain.location == [0, "ZAA"]
+    s.execute("zaa = xpa")               # the pilot arbitrates later
+    conn = s.chain.root.find_connection("XPA")
+    assert conn is not None and conn.child.name == "J154535"
+
+
 
 
 def test_k_via_typed_hole_with_unknown_destination(tmp_path):
@@ -474,21 +467,18 @@ def test_k_via_typed_hole_with_unknown_destination(tmp_path):
     s.ingest("XPA-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
     s.ingest("UNB-001\tCosmic Signature\tWormhole\t\t40.0%\t1 AU")
     s.execute("xpa H296")  # typed: connection with unknown far side
-    msg = s.follow("J154535")  # UNB also fits: the pilot must arbitrate
-    assert "which passage" in msg and s.pending_arrival is not None
-    assert set(s.arrival_candidates()) == {"XPA", "UNB"}
-    s.file_k162("XPA")
+    msg = s.follow("J154535")  # UNB also fits: placeholder + hint
+    assert "FILED ON ARRIVAL" in msg and "XPA" in msg and "UNB" in msg
+    s.execute("zaa = xpa")
     conn = s.chain.root.find_connection("XPA")
     assert conn.child.name == "J154535" and conn.wh_type == "H296"
     assert s.chain.location == [0, "XPA"]
 
 
-def test_k_abc_short_form(tmp_path):
+def test_k_without_pending_is_at_peace(tmp_path):
     s = _session_with_holes(tmp_path, holes=2)
-    s.follow("J154535")
-    msg = s.execute("k una")
-    assert "through UNA" in msg
-    assert s.chain.location == [0, "UNA"]
+    msg = s.execute("k")
+    assert "at peace" in msg
 
 
 # -- first-scan return pairing ----------------------------------------------
@@ -583,41 +573,24 @@ def test_return_repair_and_unpair(tmp_path):
 
 # -- unfiled trails -----------------------------------------------------------
 
-def test_unfiled_trail_stacks_and_files_in_order(tmp_path):
+def test_consecutive_arrivals_chain_themselves(tmp_path):
+    """Casually jumping fresh holes, never touching VAGARI: every arrival
+    files off the one before it, and backtracking walks ◉ YOU home."""
     from vagari.model.store import Store
     from vagari.session import Session
 
     s = Session.open(Store(base_dir=tmp_path / "state"))
     s.chain.root.name = "J105443"
-    msg = s.follow("J154535")
-    assert "UNMAPPED" in msg
-    msg = s.follow("J100744")
-    assert "2 unfiled jumps" in msg
-    assert s.pending_display() == "J154535 → J100744"
-
-    msg = s.file_k162()
-    assert "Filed 2 jumps" in msg
-    # Both hops on record, in order; ◉ YOU at the trail's end.
+    assert "FILED ON ARRIVAL" in s.follow("J154535")
+    assert "FILED ON ARRIVAL" in s.follow("J100744")
     assert s.chain.root.connections[0].child.name == "J154535"
     assert s.chain.root.connections[0].child.connections[0].child.name == "J100744"
     assert s.chain.current().name == "J100744"
-    assert s.pending_arrival is None
+    # Backtracking homeward relocates up the chain, no filing needed.
+    assert "Followed you back up" in s.follow("J154535")
+    assert "Followed you back up" in s.follow("J105443")
+    assert s.chain.location == [0]
 
-
-def test_unfiled_trail_backtrack_pops(tmp_path):
-    from vagari.model.store import Store
-    from vagari.session import Session
-
-    s = Session.open(Store(base_dir=tmp_path / "state"))
-    s.chain.root.name = "J105443"
-    s.follow("J154535")
-    s.follow("J100744")
-    msg = s.follow("J154535")            # jumped back through the hole
-    assert "Backtracked" in msg
-    assert s.pending_display() == "J154535"
-    assert s.follow("J105443") is None or True  # back at the anchor
-    s.follow("J105443")
-    assert s.pending_arrival is None     # trail cleared at the anchor
 
 
 def test_typing_the_paired_return_types_the_inbound_hole(tmp_path):
@@ -663,32 +636,4 @@ def test_life_and_mass_grammar_file_readings(tmp_path):
     assert inbound.mass.value == "fresh"
 
 
-def test_trail_survives_restart(tmp_path):
-    """Quit mid-trail, restart: the unfiled jumps are still queued."""
-    from vagari.model.store import Store
-    from vagari.session import Session
 
-    s = _session_with_holes(tmp_path, holes=2)
-    s.follow("J103529")
-    s.follow("J235117")
-    assert s.pending_display() == "J103529 → J235117"
-
-    s2 = Session.open(Store(base_dir=tmp_path / "state"))
-    assert s2.pending_display() == "J103529 → J235117"
-    msg = s2.file_k162("xpa")
-    assert "Filed 2 jumps" in msg
-    assert s2.pending_display() is None
-    # Filed and cleared: a third open sees an empty TRAIL file.
-    s3 = Session.open(Store(base_dir=tmp_path / "state"))
-    assert s3.pending_display() is None
-
-
-def test_mapped_arrival_reports_dropped_trail(tmp_path):
-    s = _session_with_holes(tmp_path, holes=2)   # two candidates: ambiguous
-    s.execute("fragment J154535")
-    s.jump([0])                  # back to the root fragment's origin
-    s.follow("J103529")
-    assert s.pending_display() == "J103529"
-    msg = s.follow("J154535")   # pops out somewhere already mapped
-    assert "Relocated" in msg and "dropped (J103529)" in msg
-    assert s.pending_display() is None

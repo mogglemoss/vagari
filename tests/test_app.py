@@ -170,13 +170,11 @@ async def test_follow_me_end_to_end(tmp_path, monkeypatch):
             )
         for _ in range(20):
             await pilot.pause(0.05)
-            if app.session.pending_arrival is not None:
+            if app.session.chain.location == [0, "QLM", "ZAA"]:
                 break
-        assert app.session.pending_arrival == ("J100744", [0, "QLM"])
-
-        await pilot.press("k")
-        await pilot.pause()
+        # Filed on arrival — no keypress, the map simply follows.
         assert app.session.chain.location == [0, "QLM", "ZAA"]
+        assert app.session.pending_arrival is None
         assert "J100744" in tree_text(app.query_one(ChainTree))
 
 

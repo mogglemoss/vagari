@@ -80,17 +80,16 @@ def test_rekey_from_inside_the_hole(session):
     assert parent.find_sig("ZAA") is None
 
 
-def test_rekey_absorbs_scanned_real_sig(session):
-    """The common flow: file a K162, then paste — the real sig appears as its
-    own row; rekey absorbs the placeholder into the scanned record."""
-    session.follow("J100744")
-    session.file_k162()          # ZAA → J100744
+def test_paste_absorbs_placeholder_automatically(session):
+    """The common flow: jump unscanned (files ZAA on arrival), backtrack,
+    paste — the lone new wormhole sig IS the unscanned hole, and the
+    placeholder absorbs into it without a keystroke."""
+    session.follow("J100744")    # auto-files ZAA → J100744
     session.execute("up")
-    session.ingest(
+    msg = session.ingest(
         "KDX-427\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t2 AU"
     )
-    msg = session.execute("zaa = kdx")
-    assert "absorbed into KDX" in msg
+    assert "KDX is the unscanned hole ZAA — absorbed" in msg
     here = session.chain.current()
     assert here.find_sig("ZAA") is None
     kdx = here.find_sig("KDX")

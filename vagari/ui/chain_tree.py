@@ -80,9 +80,10 @@ def system_label(system: System, here: bool, kinfo=None,
     if here:
         parts.append(f"[bold {RUST}]◉ YOU[/bold {RUST}]")
     if unfiled:
+        # Vestigial: arrivals file themselves now; a pending queue can
+        # only exist from a manual filing path.
         parts.append(
-            f"[bold {WARN}]✈ pilot beyond, unfiled: {unfiled} — k files "
-            f"it[/bold {WARN}]"
+            f"[bold {WARN}]✈ unfiled: {unfiled}[/bold {WARN}]"
         )
     for name in pilots:
         parts.append(f"[{WARN}]◎ {name}[/{WARN}]")

@@ -175,10 +175,18 @@ class Session:
         return_note = ""
         if first_scan:
             return_note = self._pair_return_from_first_scan(current)
+        absorb_note = self._absorb_placeholder(current, report.new)
+        if absorb_note:
+            # The absorbed placeholder is not a despawn — it was renamed.
+            report.despawned[:] = [
+                p for p in report.despawned if current.find_sig(p) is not None
+            ]
         self._commit()
         parts = []
         if return_note:
             parts.append(return_note)
+        if absorb_note:
+            parts.append(absorb_note)
         if report.new:
             parts.append(f"NEW: {' '.join(report.new)}")
         if report.updated:
@@ -489,6 +497,32 @@ class Session:
             f"{holes[0].prefix} filed as your return through "
             f"{inbound.sig_prefix} — sole hole in a first scan "
             f"(`return <sig>` to correct)"
+        )
+
+    def _absorb_placeholder(self, system, new_prefixes) -> str:
+        """A scan that reveals exactly one new wormhole sig, in a system
+        holding exactly one unscanned placeholder hole, is that hole —
+        the same safe assumption as first-scan return pairing. `zaa =
+        abc` remains for every messier case."""
+        placeholders = [
+            s for s in system.sigs
+            if s.label == "hole (unscanned)"
+            and system.find_connection(s.prefix) is not None
+        ]
+        if len(placeholders) != 1:
+            return ""
+        new_holes = [
+            p for p in new_prefixes
+            if (ns := system.find_sig(p)) is not None
+            and ns.group is SigGroup.WORMHOLE
+            and system.find_connection(ns.prefix) is None
+        ]
+        if len(new_holes) != 1:
+            return ""
+        old_prefix = placeholders[0].prefix
+        self._rekey(old_prefix, new_holes[0])
+        return (
+            f"{new_holes[0]} is the unscanned hole {old_prefix} — absorbed"
         )
 
     def _unopened_holes(self, system, path) -> list[str]:
@@ -1045,47 +1079,26 @@ class Session:
                 f"record as {name}.{note}"
             )
 
-        if self._pending_trail:
-            # Already roaming unfiled: this jump extends (or retraces) the
-            # trail. The anchor stays where the record last saw you.
-            if name == self._pending_trail[-1]:
-                return None  # the same unfiled system, re-announced
-            if len(self._pending_trail) >= 2 and name == self._pending_trail[-2]:
-                self._pending_trail.pop()
-                self._save_trail()
-                depth = len(self._pending_trail)
-                return (
-                    f"Backtracked to unfiled {name} — trail now "
-                    f"{depth} jump{'s' if depth != 1 else ''} deep."
-                )
-            self._pending_trail.append(name)
-            self._save_trail()
-            depth = len(self._pending_trail)
-            return (
-                f"Arrived in UNMAPPED {name} — {depth} unfiled jumps "
-                f"queued. k files the whole trail, in order."
+        # The map follows you — an unmapped arrival files itself (as every
+        # working mapper does). Topology is certain: Local named the
+        # system. Only WHICH hole can be uncertain: a lone candidate is
+        # taken; anything less files a placeholder for the next scan (or
+        # `zaa = abc`) to absorb. The Bureau files provisionally rather
+        # than fall behind the pilot.
+        candidates = [c.sig_prefix for c in unknown]
+        candidates += [p for p in unopened if p not in candidates]
+        via = candidates[0] if len(candidates) == 1 else None
+        path, note = self._file_hop(list(chain.location), name, via)
+        chain.location = path
+        self.pending_arrival = None  # any stale queue is superseded
+        self._commit()
+        if via is None and candidates:
+            listing = " · ".join(candidates)
+            note += (
+                f" (Took {listing}? `{path[-1].lower()} = "
+                f"{candidates[0].lower()}` refiles it.)"
             )
-
-        if not unknown and len(unopened) == 1:
-            # One scanned hole, one unaccounted arrival: file it through —
-            # no placeholder, no rekey, no keypress.
-            self.pending_arrival = (name, list(chain.location))
-            return self.file_k162(unopened[0])
-
-        self.pending_arrival = (name, list(chain.location))
-        if unknown or unopened:
-            listing = " · ".join(
-                [c.sig_prefix for c in unknown] + unopened
-            )
-            return (
-                f"Arrived in UNMAPPED {name} — which passage out of "
-                f"{current.name}? {listing}. Submit `k162 <sig>` or click "
-                f"one in the dossier; `k162!` files a fresh hole."
-            )
-        return (
-            f"Arrived in UNMAPPED {name}. Press k (or submit `k162`) to file it "
-            f"as a K162 out of {current.name}."
-        )
+        return f"FILED ON ARRIVAL: {note}"
 
     def arrival_candidates(self) -> list[str]:
         """Sig prefixes in the pending origin that could be the hole just

@@ -57,7 +57,7 @@ _PROCEDURE = [
     "time you jump",
     "a first scan's lone wormhole pairs itself as your return",
     "type a hole (xpa Z060) or click a candidate in its dossier",
-    "jump it — the map follows; a sole scanned hole files itself",
+    "jump — every arrival files itself; the map follows you",
     "scan · paste · repeat — home retraces the chain to where you began",
 ]
 

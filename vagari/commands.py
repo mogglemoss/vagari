@@ -88,9 +88,9 @@ REGISTRY: list[Command] = [
             "but KEEP the far side as an adrift fragment", "forest"),
     Command("fragment", "fragment [name]", "file a disconnected fragment "
             "(or a pending arrival)", "forest"),
-    Command("k162", "k162 [abc] · k abc", "file a pending arrival through "
-            "the hole you took (auto when only one fits; k162! forces a "
-            "fresh hole)", "forest", keys="k", palette="File K162",
+    Command("k162", "k162", "arrivals file themselves as you jump; k162 "
+            "hand-files a queued one in the rare case one is pending",
+            "forest", keys="k", palette="File K162",
             action="file_k162", aliases=("k", "k162!", "k!")),
     # views & custody
     Command("", "1–5", "all · paths · sites · gas · combat (structural "
